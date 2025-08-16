@@ -11,7 +11,7 @@ from nav2_common.launch import HasNodeParams
 
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
-    params_file = LaunchConfiguration('params_file')
+    params_file = LaunchConfiguration('slam_param_file')
     default_params_file = os.path.join(get_package_share_directory("vacuum_bot"),
                                        'config', 'mapper_params_online_async.yaml')
 
@@ -20,7 +20,7 @@ def generate_launch_description():
         default_value='true',
         description='Use simulation/Gazebo clock')
     declare_params_file_cmd = DeclareLaunchArgument(
-        'params_file',
+        'slam_param_file',
         default_value=default_params_file,
         description='Full path to the ROS2 parameters file to use for the slam_toolbox node')
 
