@@ -17,9 +17,26 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+
+include_directories(/usr/local/include)
+
+add_executable(step_controller_node
+  src/step_controller_node.cpp
+  # src/easywsclient.cpp
+)
+target_link_libraries(step_controller_node easywsclient)
+
+ament_target_dependencies(step_controller_node 
+  rclcpp 
+  geometry_msgs
+)
+
+install(TARGETS
+  step_controller_node
+  DESTINATION lib/${PROJECT_NAME})
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
