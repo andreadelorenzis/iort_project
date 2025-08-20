@@ -168,13 +168,13 @@ private:
 
     const int publish_rate = 300; // ms
 
-    const float ANGULAR_Z_THREESHOLD = 0.52; // 30°/s
-    const float LINEAR_X_THREESHOLD = 0.3; // 0.3m/s
+    const float ANGULAR_Z_THREESHOLD = 0.8; // 30°/s
+    const float LINEAR_X_THREESHOLD = 0.4; // 0.3m/s
     const std::map<RobotState, std::pair<double,double>> command_map = {
-        {RobotState::FORWARD,  {0.3,  0.0}},
-        {RobotState::BACKWARD, {-0.3, 0.0}},
-        {RobotState::LEFT,     {0.0,  0.52}},
-        {RobotState::RIGHT,    {0.0, -0.52}},
+        {RobotState::FORWARD,  {0.4,  0.0}},
+        {RobotState::BACKWARD, {-0.4, 0.0}},
+        {RobotState::LEFT,     {0.0,  0.8}},
+        {RobotState::RIGHT,    {0.0, -0.8}},
         {RobotState::STOP,     {0.0,  0.0}}
     };
     float acc_linear_x = 0;

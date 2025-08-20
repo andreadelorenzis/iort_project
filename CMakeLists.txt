@@ -18,40 +18,77 @@ endif()
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
+find_package(nav2_core REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(Fields2Cover REQUIRED)
 
-include_directories(/usr/local/include)
-
-add_executable(step_controller_node
-  src/step_controller_node.cpp
-  # src/easywsclient.cpp
+include_directories(
+  include 
+  /usr/local/include
 )
+
+# Executables
+add_executable(step_controller_node src/step_controller_node.cpp)
+add_executable(coverage_nav2_node src/coverage_nav2_node.cpp)
+
+# Libraries
+add_library(coverage_planner SHARED src/coverage_planner.cpp)
+
+# Link libraries
 target_link_libraries(step_controller_node easywsclient)
 
-ament_target_dependencies(step_controller_node 
-  rclcpp 
+# Dependencies
+ament_target_dependencies(step_controller_node
+  rclcpp
   geometry_msgs
+  nav2_core
+  pluginlib
 )
 
+ament_target_dependencies(coverage_nav2_node
+  rclcpp
+  geometry_msgs
+  nav2_core
+  pluginlib
+  Fields2Cover
+)
+
+ament_target_dependencies(coverage_planner
+  rclcpp
+  nav2_core
+  pluginlib
+  Fields2Cover
+)
+
+# Plugin export
+pluginlib_export_plugin_description_file(nav2_core plugin.xml)
+
+# Install targets
 install(TARGETS
   step_controller_node
-  DESTINATION lib/${PROJECT_NAME})
+  coverage_nav2_node
+  coverage_planner
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}  # <-- this makes ros2 run find them
+)
 
-
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # uncomment the line when a copyright and license is not present in all source files
-  #set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # uncomment the line when this package is not in a git repo
-  #set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
+# Install other files
+install(FILES plugin.xml
+  DESTINATION share/${PROJECT_NAME}
+)
 
 install(
   DIRECTORY config description launch worlds
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY include/
+  DESTINATION include
 )
 
 ament_package()

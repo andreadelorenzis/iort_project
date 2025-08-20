@@ -112,6 +112,17 @@ def generate_launch_description():
         arguments=["/camera/image_raw"]
     )
 
+    nav2_params_file = os.path.join(
+        get_package_share_directory('vacuum_bot'),
+        'config',
+        'nav2_params.yaml'
+    )
+
+    nav2 = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory(package_name),'launch','navigation_launch.py'
+        )]), launch_arguments={'use_sim_time': 'true', 'params_file': nav2_params_file}.items()
+    )
 
     # Launch them all!
     return LaunchDescription([
@@ -125,5 +136,6 @@ def generate_launch_description():
         joint_broad_spawner,
         ros_gz_bridge,
         ros_gz_image_bridge,
-        step_controller_node
+        step_controller_node,
+        nav2
     ])
