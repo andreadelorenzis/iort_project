@@ -24,6 +24,8 @@ find_package(nav2_msgs REQUIRED)
 find_package(nav2_core REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(Fields2Cover REQUIRED)
+find_package(lifecycle_msgs REQUIRED)
+find_package(opennav_coverage_msgs REQUIRED)
 
 include_directories(
   include 
@@ -50,10 +52,13 @@ ament_target_dependencies(step_controller_node
 
 ament_target_dependencies(coverage_nav2_node
   rclcpp
+  rclcpp_action
   geometry_msgs
   nav2_core
   pluginlib
   Fields2Cover
+  lifecycle_msgs
+  opennav_coverage_msgs
 )
 
 ament_target_dependencies(coverage_planner
@@ -73,7 +78,7 @@ install(TARGETS
   coverage_planner
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION lib/${PROJECT_NAME}  # <-- this makes ros2 run find them
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 # Install other files

@@ -1,110 +1,206 @@
-#include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/pose_stamped.hpp>
-#include <nav2_msgs/action/follow_waypoints.hpp>
-#include <rclcpp_action/rclcpp_action.hpp>
-#include <tf2/LinearMath/Quaternion.h>
-#include <cmath>
-
+#include <chrono>
+#include <memory>
+#include <string>
+#include <thread>
 #include <vector>
+#include <iostream>
 
-using FollowWaypoints = nav2_msgs::action::FollowWaypoints;
-using GoalHandleFollowWaypoints = rclcpp_action::ClientGoalHandle<FollowWaypoints>;
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
 
-class SquarePathNode : public rclcpp::Node
+#include "geometry_msgs/msg/point32.hpp"
+#include "geometry_msgs/msg/polygon.hpp"
+#include "lifecycle_msgs/srv/get_state.hpp"
+#include "action_msgs/msg/goal_status.hpp"
+
+#include "opennav_coverage_msgs/action/navigate_complete_coverage.hpp"
+
+using namespace std::chrono_literals;
+using NavigateCoverage = opennav_coverage_msgs::action::NavigateCompleteCoverage;
+using GoalHandleCoverage = rclcpp_action::ClientGoalHandle<NavigateCoverage>;
+
+enum class TaskResult
+{
+  UNKNOWN = 0,
+  SUCCEEDED = 1,
+  CANCELED = 2,
+  FAILED = 3
+};
+
+class CoverageNavigatorTester : public rclcpp::Node
 {
 public:
-    SquarePathNode()
-    : Node("square_path_node")
-    {
-        client_ptr_ = rclcpp_action::create_client<FollowWaypoints>(this, "/follow_waypoints");
+  CoverageNavigatorTester()
+  : Node("coverage_navigator_tester")
+  {
+    coverage_client_ = rclcpp_action::create_client<NavigateCoverage>(
+      this, "navigate_complete_coverage");
+  }
 
-        generate_square_path();
-        send_goal();
+  geometry_msgs::msg::Polygon toPolygon(const std::vector<std::array<double, 2>> & field)
+  {
+    geometry_msgs::msg::Polygon poly;
+    for (auto & coord : field) {
+      geometry_msgs::msg::Point32 pt;
+      pt.x = coord[0];
+      pt.y = coord[1];
+      poly.points.push_back(pt);
     }
+    return poly;
+  }
+
+  bool navigateCoverage(const std::vector<std::array<double, 2>> & field)
+  {
+    RCLCPP_INFO(this->get_logger(), "Waiting for 'NavigateCompleteCoverage' action server...");
+    if (!coverage_client_->wait_for_action_server(10s)) {
+      RCLCPP_ERROR(this->get_logger(), "Action server not available after waiting");
+      return false;
+    }
+
+    auto goal_msg = NavigateCoverage::Goal();
+    goal_msg.frame_id = "map";
+    goal_msg.polygons.push_back(toPolygon(field));
+
+    RCLCPP_INFO(this->get_logger(), "Sending NavigateCoverage goal...");
+
+    auto send_goal_options = rclcpp_action::Client<NavigateCoverage>::SendGoalOptions();
+    send_goal_options.feedback_callback =
+      [this](GoalHandleCoverage::SharedPtr, const std::shared_ptr<const NavigateCoverage::Feedback> feedback) {
+        this->feedback_ = *feedback;
+      };
+
+    auto future_goal_handle = coverage_client_->async_send_goal(goal_msg, send_goal_options);
+
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future_goal_handle) !=
+      rclcpp::FutureReturnCode::SUCCESS)
+    {
+      RCLCPP_ERROR(this->get_logger(), "Send goal call failed");
+      return false;
+    }
+
+    goal_handle_ = future_goal_handle.get();
+    if (!goal_handle_) {
+      RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
+      return false;
+    }
+
+    result_future_ = coverage_client_->async_get_result(goal_handle_);
+    return true;
+  }
+
+  bool isTaskComplete()
+  {
+    if (!result_future_.valid()) {
+      return true;
+    }
+
+    auto ret = rclcpp::spin_until_future_complete(this->get_node_base_interface(),
+      result_future_, 100ms);
+
+    if (ret == rclcpp::FutureReturnCode::SUCCESS) {
+      auto wrapped_result = result_future_.get();
+      status_ = static_cast<int8_t>(wrapped_result.code);
+      if (status_ != action_msgs::msg::GoalStatus::STATUS_SUCCEEDED) {
+        RCLCPP_WARN(this->get_logger(), "Task failed with status code: %d", status_);
+      } else {
+        RCLCPP_INFO(this->get_logger(), "Task succeeded!");
+      }
+      return true;
+    }
+
+    return false; // still running
+  }
+
+  NavigateCoverage::Feedback getFeedback()
+  {
+    return feedback_;
+  }
+
+  TaskResult getResult()
+  {
+    if (status_ == action_msgs::msg::GoalStatus::STATUS_SUCCEEDED) {
+      return TaskResult::SUCCEEDED;
+    } else if (status_ == action_msgs::msg::GoalStatus::STATUS_ABORTED) {
+      return TaskResult::FAILED;
+    } else if (status_ == action_msgs::msg::GoalStatus::STATUS_CANCELED) {
+      return TaskResult::CANCELED;
+    }
+    return TaskResult::UNKNOWN;
+  }
+
+  void startup(const std::string & node_name = "bt_navigator")
+  {
+    auto client = this->create_client<lifecycle_msgs::srv::GetState>(node_name + "/get_state");
+
+    RCLCPP_INFO(this->get_logger(), "Waiting for %s to become active...", node_name.c_str());
+    while (!client->wait_for_service(1s)) {
+      RCLCPP_WARN(this->get_logger(), "Service %s not available, waiting...", (node_name + "/get_state").c_str());
+    }
+
+    auto req = std::make_shared<lifecycle_msgs::srv::GetState::Request>();
+    std::string state = "unknown";
+
+    while (state != "active") {
+      auto future = client->async_send_request(req);
+      if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), future) ==
+        rclcpp::FutureReturnCode::SUCCESS)
+      {
+        auto resp = future.get();
+        state = resp->current_state.label;
+        RCLCPP_INFO(this->get_logger(), "Result of get_state: %s", state.c_str());
+      }
+      std::this_thread::sleep_for(2s);
+    }
+  }
 
 private:
-    rclcpp_action::Client<FollowWaypoints>::SharedPtr client_ptr_;
-    std::vector<geometry_msgs::msg::PoseStamped> square_path_;
+  rclcpp_action::Client<NavigateCoverage>::SharedPtr coverage_client_;
+  GoalHandleCoverage::SharedPtr goal_handle_;
+  rclcpp::Client<lifecycle_msgs::srv::GetState>::SharedPtr state_client_;
 
-    void generate_square_path()
-    {
-        geometry_msgs::msg::PoseStamped pose;
-        pose.header.frame_id = "map";
-        pose.pose.position.z = 0.0;
-
-        std::vector<std::pair<double,double>> points = {
-            {0.0, 0.0},  // start
-            {1.0, 0.0},
-            {1.0, 1.0},
-            {0.0, 1.0},
-            {0.0, 0.0}   // close loop
-        };
-
-        for (size_t i = 0; i < points.size(); ++i) {
-            pose.pose.position.x = points[i].first;
-            pose.pose.position.y = points[i].second;
-
-            // compute yaw towards the next point (if not last)
-            double yaw = 0.0;
-            if (i < points.size() - 1) {
-                double dx = points[i+1].first - points[i].first;
-                double dy = points[i+1].second - points[i].second;
-                yaw = std::atan2(dy, dx);
-            }
-
-            // convert yaw to quaternion
-            tf2::Quaternion q;
-            q.setRPY(0, 0, yaw);
-            pose.pose.orientation.x = q.x();
-            pose.pose.orientation.y = q.y();
-            pose.pose.orientation.z = q.z();
-            pose.pose.orientation.w = q.w();
-
-            square_path_.push_back(pose);
-        }
-    }
-
-    void send_goal()
-    {
-        if (!client_ptr_->wait_for_action_server(std::chrono::seconds(10))) {
-            RCLCPP_ERROR(this->get_logger(), "FollowWaypoints action server not available!");
-            return;
-        }
-
-        auto goal_msg = FollowWaypoints::Goal();
-        goal_msg.poses = square_path_;
-
-        auto options = rclcpp_action::Client<FollowWaypoints>::SendGoalOptions();
-        options.goal_response_callback =
-            [](GoalHandleFollowWaypoints::SharedPtr goal_handle) {
-                if (!goal_handle) {
-                    RCLCPP_ERROR(rclcpp::get_logger("rclcpp"), "Goal was rejected by server");
-                } else {
-                    RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "Goal accepted by server");
-                }
-            };
-
-        options.feedback_callback =
-            [](GoalHandleFollowWaypoints::SharedPtr,
-               const std::shared_ptr<const FollowWaypoints::Feedback> feedback) {
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-                            "Reached waypoint index: %u", feedback->current_waypoint);
-            };
-
-        options.result_callback =
-            [](const GoalHandleFollowWaypoints::WrappedResult & result) {
-                RCLCPP_INFO(rclcpp::get_logger("rclcpp"),
-                            "Completed square with status: %d", static_cast<int>(result.code));
-            };
-
-        client_ptr_->async_send_goal(goal_msg, options);
-    }
+  std::shared_future<GoalHandleCoverage::WrappedResult> result_future_;
+  int8_t status_{action_msgs::msg::GoalStatus::STATUS_UNKNOWN};
+  NavigateCoverage::Feedback feedback_;
 };
 
 int main(int argc, char ** argv)
 {
-    rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<SquarePathNode>());
-    rclcpp::shutdown();
-    return 0;
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<CoverageNavigatorTester>();
+
+  node->startup();
+
+  // Example polygon field
+  std::vector<std::array<double, 2>> field = {
+    {5.0, 5.0}, {5.0, 15.0}, {15.0, 15.0}, {10.0, 5.0}, {5.0, 5.0}
+  };
+
+  if (!node->navigateCoverage(field)) {
+    RCLCPP_ERROR(node->get_logger(), "Failed to send coverage goal");
+    return 1;
+  }
+
+  int i = 0;
+  while (!node->isTaskComplete() && rclcpp::ok()) {
+    auto fb = node->getFeedback();
+    if ((i++ % 5) == 0 && fb.estimated_time_remaining.sec > 0) {
+      RCLCPP_INFO(node->get_logger(), "Estimated time remaining: %d seconds",
+        fb.estimated_time_remaining.sec);
+    }
+    std::this_thread::sleep_for(1s);
+  }
+
+  auto result = node->getResult();
+  if (result == TaskResult::SUCCEEDED) {
+    RCLCPP_INFO(node->get_logger(), "Goal succeeded!");
+  } else if (result == TaskResult::CANCELED) {
+    RCLCPP_WARN(node->get_logger(), "Goal was canceled!");
+  } else if (result == TaskResult::FAILED) {
+    RCLCPP_ERROR(node->get_logger(), "Goal failed!");
+  } else {
+    RCLCPP_ERROR(node->get_logger(), "Goal returned unknown result!");
+  }
+
+  rclcpp::shutdown();
+  return 0;
 }
