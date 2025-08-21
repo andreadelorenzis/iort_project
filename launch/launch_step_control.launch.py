@@ -9,19 +9,14 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 from launch_ros.actions import Node
-from launch.actions import RegisterEventHandler
-from launch.event_handlers import OnProcessExit
+from launch.actions import RegisterEventHandler, TimerAction
+from launch.event_handlers import OnProcessExit, OnProcessStart
 
 
 
 def generate_launch_description():
-
-
-    # Include the robot_state_publisher launch file, provided by our own package. Force sim time to be enabled
-    # !!! MAKE SURE YOU SET THE PACKAGE NAME CORRECTLY !!!
-
-    package_name='vacuum_bot' #<--- CHANGE ME
-
+    package_name='vacuum_bot'
+    
     rsp = IncludeLaunchDescription(
                 PythonLaunchDescriptionSource([os.path.join(
                     get_package_share_directory(package_name),'launch','rsp.launch.py'
@@ -124,6 +119,43 @@ def generate_launch_description():
         )]), launch_arguments={'use_sim_time': 'true', 'params_file': nav2_params_file}.items()
     )
 
+    slam_params_file = os.path.join(
+        get_package_share_directory(package_name),
+        'config',
+        'mapper_params_online_async.yaml'
+    )
+
+    slam_toolbox = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory('slam_toolbox'),
+            'launch',
+            'online_async_launch.py'
+        )]),
+        launch_arguments={
+            'slam_params_file': slam_params_file,
+            'use_sim_time': 'true'
+        }.items()
+    )
+
+    rviz_config_file = os.path.join(
+        get_package_share_directory(package_name),
+        'config',
+        'map.rviz'
+    )
+
+    rviz_node = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        arguments=["-d", rviz_config_file],
+        output="screen"
+    )
+
+    delayed_rviz = TimerAction(
+        period=5.0,   # aspetta 5 secondi
+        actions=[rviz_node]
+    )
+
     # Launch them all!
     return LaunchDescription([
         rsp,
@@ -137,5 +169,8 @@ def generate_launch_description():
         ros_gz_bridge,
         ros_gz_image_bridge,
         step_controller_node,
-        nav2
+        nav2,
+        slam_toolbox,
+        # rviz_node,
+        delayed_rviz
     ])
