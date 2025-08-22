@@ -19,6 +19,7 @@ from launch_ros.actions import LoadComposableNodes
 from launch_ros.actions import Node
 from launch_ros.descriptions import ComposableNode, ParameterFile
 from nav2_common.launch import RewrittenYaml
+from launch_ros.actions import SetParameter
 
 
 def generate_launch_description():
@@ -60,6 +61,13 @@ def generate_launch_description():
         remappings=remappings,
         output='screen')
 
+    declare_bt_xml_param = DeclareLaunchArgument(
+        'default_nav_to_pose_bt_xml',
+        default_value='/home/andre/dev_ws/install/vacuum_bot/share/vacuum_bot/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml',
+        description='Path to custom NavigateToPose BT XML'
+    )
+
+
     load_composable_nodes = LoadComposableNodes(
         target_container='nav2_container',
         composable_node_descriptions=[
@@ -79,7 +87,10 @@ def generate_launch_description():
                 package='backported_bt_navigator',
                 plugin='backported_bt_navigator::BtNavigator',
                 name='bt_navigator',
-                parameters=[configured_params],
+                parameters=[
+                    configured_params, 
+                    # {'default_nav_to_pose_bt_xml': LaunchConfiguration('default_nav_to_pose_bt_xml')}
+                    ],
                 remappings=remappings),
             ComposableNode(
                 package='nav2_velocity_smoother',
@@ -102,6 +113,7 @@ def generate_launch_description():
     ld = LaunchDescription()
     ld.add_action(stdout_linebuf_envvar)
     ld.add_action(declare_params_file_cmd)
+    # ld.add_action(declare_bt_xml_param)
     ld.add_action(create_container)
     ld.add_action(load_composable_nodes)
     return ld

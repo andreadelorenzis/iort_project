@@ -179,24 +179,25 @@ def generate_launch_description():
 
     # start navigation
 
-    # nav2_params_file = os.path.join(
-    #     get_package_share_directory('vacuum_bot'),
-    #     'config',
-    #     'nav2_params.yaml'
-    # )
+    nav2_params_file = os.path.join(
+        get_package_share_directory('vacuum_bot'),
+        'config',
+        'nav2_params.yaml'
+    )
 
-    # nav2 = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource([os.path.join(
-    #         get_package_share_directory(package_name),'launch','navigation_launch.py'
-    #     )]), launch_arguments={'use_sim_time': 'true', 'params_file': nav2_params_file}.items()
-    # )
+    nav2 = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([os.path.join(
+            get_package_share_directory(package_name),'launch','navigation_launch.py'
+        )]), launch_arguments={'use_sim_time': 'true', 'params_file': nav2_params_file}.items()
+    )
 
     bringup_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(get_package_share_directory(package_name), 
                          'launch',
                          'opennav_bringup_launch.py')),
-        launch_arguments={'params_file': coverage_config_file}.items())
+        launch_arguments={'params_file': coverage_config_file,
+                        'log_level': 'debug'}.items())
     
     # If no localization system (es. AMCL, SLAM toolbox) is used, use this 
     # to publish a static transform map -> odom to make rviz and nav2 work. 
@@ -211,7 +212,8 @@ def generate_launch_description():
         package=package_name,
         executable='coverage_nav2_node',
         emulate_tty=True,
-        output='screen'
+        output='screen',
+        arguments=['--ros-args', '--log-level', 'debug']
     )
 
     # Launch them all!
@@ -227,12 +229,12 @@ def generate_launch_description():
         ros_gz_bridge,
         ros_gz_image_bridge,
         step_controller_node,
-        # nav2,
+        nav2,
         slam_toolbox,
         # rviz_node,
         delayed_rviz,
         # rviz_cmd,
-        bringup_cmd,
+        # bringup_cmd,
         # fake_localization_cmd,
-        coverage_node
+        # coverage_node
     ])

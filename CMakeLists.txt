@@ -34,6 +34,7 @@ include_directories(
 
 # Executables
 add_executable(step_controller_node src/step_controller_node.cpp)
+add_executable(web_bridge_node src/web_bridge_node.cpp)
 add_executable(coverage_nav2_node src/coverage_nav2_node.cpp)
 
 # Libraries
@@ -41,6 +42,7 @@ add_library(coverage_planner SHARED src/coverage_planner.cpp)
 
 # Link libraries
 target_link_libraries(step_controller_node easywsclient)
+target_link_libraries(web_bridge_node easywsclient)
 
 # Dependencies
 ament_target_dependencies(step_controller_node
@@ -49,6 +51,12 @@ ament_target_dependencies(step_controller_node
   nav2_core
   pluginlib
 )
+
+ament_target_dependencies(web_bridge_node
+  rclcpp
+  geometry_msgs
+)
+
 
 ament_target_dependencies(coverage_nav2_node
   rclcpp
@@ -74,6 +82,7 @@ pluginlib_export_plugin_description_file(nav2_core plugin.xml)
 # Install targets
 install(TARGETS
   step_controller_node
+  web_bridge_node
   coverage_nav2_node
   coverage_planner
   ARCHIVE DESTINATION lib
@@ -87,7 +96,7 @@ install(FILES plugin.xml
 )
 
 install(
-  DIRECTORY config description launch worlds
+  DIRECTORY config description launch worlds behavior_trees
   DESTINATION share/${PROJECT_NAME}
 )
 

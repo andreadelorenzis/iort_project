@@ -14,10 +14,13 @@
 #include "action_msgs/msg/goal_status.hpp"
 
 #include "opennav_coverage_msgs/action/navigate_complete_coverage.hpp"
+#include "nav2_msgs/action/navigate_to_pose.hpp"
 
 using namespace std::chrono_literals;
 using NavigateCoverage = opennav_coverage_msgs::action::NavigateCompleteCoverage;
 using GoalHandleCoverage = rclcpp_action::ClientGoalHandle<NavigateCoverage>;
+using NavigateToPose = nav2_msgs::action::NavigateToPose;
+using GoalHandlePose = rclcpp_action::ClientGoalHandle<NavigateToPose>;
 
 enum class TaskResult
 {
@@ -35,6 +38,15 @@ public:
   {
     coverage_client_ = rclcpp_action::create_client<NavigateCoverage>(
       this, "navigate_complete_coverage");
+
+    nav2_client_ = rclcpp_action::create_client<NavigateToPose>(
+      this, "navigate_to_pose");
+
+    // Subscribe to /coverage_zone
+    polygon_sub_ = this->create_subscription<geometry_msgs::msg::Polygon>(
+      "/coverage_zone",
+      10,
+      std::bind(&CoverageNavigatorTester::polygonCallback, this, std::placeholders::_1));
   }
 
   geometry_msgs::msg::Polygon toPolygon(const std::vector<std::array<double, 2>> & field)
@@ -48,6 +60,48 @@ public:
     }
     return poly;
   }
+
+  bool goToFirstPoint(const std::array<double,2> & first_point)
+  {
+      RCLCPP_INFO(this->get_logger(), "Navigating to first point (%.2f, %.2f)...",
+                  first_point[0], first_point[1]);
+
+      if (!nav2_client_->wait_for_action_server(10s)) {
+          RCLCPP_ERROR(this->get_logger(), "Nav2 action server not available");
+          return false;
+      }
+
+      auto goal_msg = NavigateToPose::Goal();
+      goal_msg.pose.header.frame_id = "map";
+      goal_msg.pose.header.stamp = this->now();
+      goal_msg.pose.pose.position.x = first_point[0];
+      goal_msg.pose.pose.position.y = first_point[1];
+      goal_msg.pose.pose.orientation.w = 1.0; // facing forward
+
+      auto send_goal_options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
+      send_goal_options.result_callback = [](const GoalHandlePose::WrappedResult & result){
+          if (result.code == rclcpp_action::ResultCode::SUCCEEDED)
+              RCLCPP_INFO(rclcpp::get_logger("CoverageNavigatorTester"), "Reached first point!");
+          else
+              RCLCPP_WARN(rclcpp::get_logger("CoverageNavigatorTester"), "Failed to reach first point");
+      };
+
+      auto goal_handle_future = nav2_client_->async_send_goal(goal_msg, send_goal_options);
+
+      // Wait until navigation is done
+      auto goal_handle = rclcpp::spin_until_future_complete(this->get_node_base_interface(), goal_handle_future);
+      if (goal_handle != rclcpp::FutureReturnCode::SUCCESS || !goal_handle_future.get()) {
+          RCLCPP_ERROR(this->get_logger(), "Failed to send goal to Nav2");
+          return false;
+      }
+
+      // Wait for result
+      auto result_future = nav2_client_->async_get_result(goal_handle_future.get());
+      auto status = rclcpp::spin_until_future_complete(this->get_node_base_interface(), result_future);
+      return status == rclcpp::FutureReturnCode::SUCCESS &&
+            result_future.get().code == rclcpp_action::ResultCode::SUCCEEDED;
+  }
+
 
   bool navigateCoverage(const std::vector<std::array<double, 2>> & field)
   {
@@ -154,9 +208,38 @@ public:
   }
 
 private:
+  void polygonCallback(const geometry_msgs::msg::Polygon::SharedPtr msg)
+  {
+    if (msg->points.empty()) {
+      RCLCPP_WARN(this->get_logger(), "Received empty polygon, ignoring");
+      return;
+    }
+
+    // Convert Polygon to std::vector<std::array<double,2>>
+    std::vector<std::array<double,2>> field;
+    for (const auto &pt : msg->points) {
+      field.push_back({pt.x, pt.y});
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Received polygon with %zu points", field.size());
+
+    // First, go to the first point
+    if (!goToFirstPoint(field[0])) {
+        RCLCPP_ERROR(this->get_logger(), "Failed to reach first point, aborting coverage");
+        return;
+    }
+
+    // Then send the full polygon to the coverage action
+    if (!navigateCoverage(field)) {
+      RCLCPP_ERROR(this->get_logger(), "Failed to send coverage goal");
+    }
+  }
+
   rclcpp_action::Client<NavigateCoverage>::SharedPtr coverage_client_;
+  rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr polygon_sub_;
   GoalHandleCoverage::SharedPtr goal_handle_;
   rclcpp::Client<lifecycle_msgs::srv::GetState>::SharedPtr state_client_;
+  rclcpp_action::Client<NavigateToPose>::SharedPtr nav2_client_;
 
   std::shared_future<GoalHandleCoverage::WrappedResult> result_future_;
   int8_t status_{action_msgs::msg::GoalStatus::STATUS_UNKNOWN};
@@ -167,40 +250,51 @@ int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<CoverageNavigatorTester>();
-
   node->startup();
-
-  // Example polygon field
-  std::vector<std::array<double, 2>> field = {
-    {5.0, 5.0}, {5.0, 15.0}, {15.0, 15.0}, {10.0, 5.0}, {5.0, 5.0}
-  };
-
-  if (!node->navigateCoverage(field)) {
-    RCLCPP_ERROR(node->get_logger(), "Failed to send coverage goal");
-    return 1;
-  }
-
-  int i = 0;
-  while (!node->isTaskComplete() && rclcpp::ok()) {
-    auto fb = node->getFeedback();
-    if ((i++ % 5) == 0 && fb.estimated_time_remaining.sec > 0) {
-      RCLCPP_INFO(node->get_logger(), "Estimated time remaining: %d seconds",
-        fb.estimated_time_remaining.sec);
-    }
-    std::this_thread::sleep_for(1s);
-  }
-
-  auto result = node->getResult();
-  if (result == TaskResult::SUCCEEDED) {
-    RCLCPP_INFO(node->get_logger(), "Goal succeeded!");
-  } else if (result == TaskResult::CANCELED) {
-    RCLCPP_WARN(node->get_logger(), "Goal was canceled!");
-  } else if (result == TaskResult::FAILED) {
-    RCLCPP_ERROR(node->get_logger(), "Goal failed!");
-  } else {
-    RCLCPP_ERROR(node->get_logger(), "Goal returned unknown result!");
-  }
-
+  rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;
 }
+
+
+// int main(int argc, char ** argv)
+// {
+//   rclcpp::init(argc, argv);
+//   auto node = std::make_shared<CoverageNavigatorTester>();
+
+//   node->startup();
+
+//   // Example polygon field
+//   std::vector<std::array<double, 2>> field = {
+//     {5.0, 5.0}, {5.0, 15.0}, {15.0, 15.0}, {10.0, 5.0}, {5.0, 5.0}
+//   };
+
+//   if (!node->navigateCoverage(field)) {
+//     RCLCPP_ERROR(node->get_logger(), "Failed to send coverage goal");
+//     return 1;
+//   }
+
+//   int i = 0;
+//   while (!node->isTaskComplete() && rclcpp::ok()) {
+//     auto fb = node->getFeedback();
+//     if ((i++ % 5) == 0 && fb.estimated_time_remaining.sec > 0) {
+//       RCLCPP_INFO(node->get_logger(), "Estimated time remaining: %d seconds",
+//         fb.estimated_time_remaining.sec);
+//     }
+//     std::this_thread::sleep_for(1s);
+//   }
+
+//   auto result = node->getResult();
+//   if (result == TaskResult::SUCCEEDED) {
+//     RCLCPP_INFO(node->get_logger(), "Goal succeeded!");
+//   } else if (result == TaskResult::CANCELED) {
+//     RCLCPP_WARN(node->get_logger(), "Goal was canceled!");
+//   } else if (result == TaskResult::FAILED) {
+//     RCLCPP_ERROR(node->get_logger(), "Goal failed!");
+//   } else {
+//     RCLCPP_ERROR(node->get_logger(), "Goal returned unknown result!");
+//   }
+
+//   rclcpp::shutdown();
+//   return 0;
+// }
