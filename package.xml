@@ -24,7 +24,6 @@
   <depend>opennav_coverage</depend>
   <depend>opennav_row_coverage</depend>
   <depend>opennav_coverage_navigator</depend>
-  <depend>backported_bt_navigator</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

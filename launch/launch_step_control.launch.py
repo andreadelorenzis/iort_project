@@ -119,6 +119,13 @@ def generate_launch_description():
         )]), launch_arguments={'use_sim_time': 'true', 'params_file': nav2_params_file}.items()
     )
 
+    delayed_nav2 = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=diff_drive_spawner,
+            on_exit=[nav2]
+        )
+    )
+
     slam_params_file = os.path.join(
         get_package_share_directory(package_name),
         'config',
@@ -135,6 +142,13 @@ def generate_launch_description():
             'slam_params_file': slam_params_file,
             'use_sim_time': 'true'
         }.items()
+    )
+
+    delayed_slam = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=diff_drive_spawner,
+            on_exit=[slam_toolbox]
+        )
     )
 
     rviz_config_file = os.path.join(

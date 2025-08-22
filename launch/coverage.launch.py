@@ -34,6 +34,7 @@ def generate_launch_description():
         default_value=default_world,
         description='World to load'
         )
+    
     twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
     
     # Start robot state publisher
@@ -70,8 +71,8 @@ def generate_launch_description():
         arguments=[
             '-topic', 'robot_description',
             '-name', 'my_bot',
-            '-x', '5.0',
-            '-y', '5.0',
+            '-x', '0.0',
+            '-y', '0.0',
             '-z', '0.1',
             '-R', '0.0',
             '-P', '0.0',
@@ -196,8 +197,7 @@ def generate_launch_description():
             os.path.join(get_package_share_directory(package_name), 
                          'launch',
                          'opennav_bringup_launch.py')),
-        launch_arguments={'params_file': coverage_config_file,
-                        'log_level': 'debug'}.items())
+        launch_arguments={'use_sim_time': 'true', 'params_file': coverage_config_file}.items())
     
     # If no localization system (es. AMCL, SLAM toolbox) is used, use this 
     # to publish a static transform map -> odom to make rviz and nav2 work. 
@@ -213,7 +213,7 @@ def generate_launch_description():
         executable='coverage_nav2_node',
         emulate_tty=True,
         output='screen',
-        arguments=['--ros-args', '--log-level', 'debug']
+        # arguments=['--ros-args', '--log-level', 'debug']
     )
 
     # Launch them all!
@@ -228,13 +228,13 @@ def generate_launch_description():
         joint_broad_spawner,
         ros_gz_bridge,
         ros_gz_image_bridge,
-        step_controller_node,
-        nav2,
+        # step_controller_node,
+        # nav2,
         slam_toolbox,
         # rviz_node,
         delayed_rviz,
         # rviz_cmd,
-        # bringup_cmd,
+        bringup_cmd,
         # fake_localization_cmd,
-        # coverage_node
+        coverage_node
     ])

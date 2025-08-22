@@ -46,6 +46,12 @@ public:
             10);
         RCLCPP_INFO(this->get_logger(), "Publisher on /coverage_zone created");
 
+        coverage_pub_ = this->create_publisher<geometry_msgs::msg::Polygon>(
+            "/coverage_start", 
+            10);
+        RCLCPP_INFO(this->get_logger(), "Publisher on /coverage_start created");
+
+
         // Timer to poll websocket every 50ms
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(50),
@@ -74,6 +80,7 @@ private:
                 // Parse JSON
                 auto j = json::parse(message);
 
+                // Polygon normale
                 if (j.contains("type") && j["type"] == "polygon" && j.contains("points")) {
                     geometry_msgs::msg::Polygon poly;
 
@@ -91,6 +98,22 @@ private:
                         RCLCPP_INFO(this->get_logger(), "Published polygon with %zu points", poly.points.size());
                     }
                 }
+
+                // Nuovo tipo: coverage
+                else if (j.contains("type") && j["type"] == "coverage" && j.contains("points")) {
+                    geometry_msgs::msg::Polygon poly;
+                    for (auto &pt : j["points"]) {
+                        geometry_msgs::msg::Point32 p;
+                        p.x = std::stof(pt["x"].get<std::string>());
+                        p.y = std::stof(pt["y"].get<std::string>());
+                        p.z = 0.0;
+                        poly.points.push_back(p);
+                    }
+                    if (!poly.points.empty()) {
+                        coverage_pub_->publish(poly);
+                        RCLCPP_INFO(this->get_logger(), "Published coverage polygon with %zu points", poly.points.size());
+                    }
+                }
             } catch (const std::exception &e) {
                 RCLCPP_ERROR(this->get_logger(), "Failed to parse JSON: %s", e.what());
             }
@@ -98,6 +121,7 @@ private:
     }
 
     rclcpp::Publisher<geometry_msgs::msg::Polygon>::SharedPtr pub_;
+    rclcpp::Publisher<geometry_msgs::msg::Polygon>::SharedPtr coverage_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
     int sock_{-1};
 };

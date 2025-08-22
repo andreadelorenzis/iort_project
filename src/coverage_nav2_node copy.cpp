@@ -31,9 +31,6 @@ public:
     polygon_sub_ = this->create_subscription<geometry_msgs::msg::Polygon>(
       "/coverage_zone", 10, std::bind(&CoverageNavigatorTester::polygonCallback, this, std::placeholders::_1));
 
-    coverage_sub_ = this->create_subscription<geometry_msgs::msg::Polygon>(
-      "/coverage_start", 10, std::bind(&CoverageNavigatorTester::coverageCallback, this, std::placeholders::_1));
-
     RCLCPP_INFO(this->get_logger(), "Coverage tester node ready. Waiting for polygon on /coverage_zone.");
   }
 
@@ -78,31 +75,6 @@ private:
     goToStartPoint(field);
   }
 
-  // --- Nuova callback per /coverage_start ---
-  void coverageCallback(const geometry_msgs::msg::Polygon::SharedPtr msg)
-  {
-    if (is_task_running_) {
-      RCLCPP_WARN(this->get_logger(), "A task is already running. Ignoring coverage message.");
-      return;
-    }
-
-    if (msg->points.empty()) {
-      RCLCPP_WARN(this->get_logger(), "Received empty coverage polygon, ignoring.");
-      return;
-    }
-
-    std::vector<std::array<double, 2>> field;
-    for (const auto &pt : msg->points) {
-      field.push_back({pt.x, pt.y});
-    }
-
-    RCLCPP_INFO(this->get_logger(), "Received coverage polygon with %zu points. Starting coverage directly.", field.size());
-    is_task_running_ = true;
-
-    // Parte subito con la copertura senza andare al punto di partenza
-    startCoverage(field);
-  }
-
   // 2. Funzione che invia il goal per raggiungere il punto di partenza.
   void goToStartPoint(const std::vector<std::array<double, 2>>& field)
   {
@@ -116,7 +88,7 @@ private:
     goal_msg.pose.header.frame_id = "map";
     goal_msg.pose.header.stamp = this->now();
 
-    double safe_margin = 0.0;
+    double safe_margin = 0.5;
     double entry_x = field[0][0] + safe_margin;
     double entry_y = field[0][1] + safe_margin;
 
@@ -162,17 +134,6 @@ private:
 
     auto send_goal_options = rclcpp_action::Client<NavigateCoverage>::SendGoalOptions();
     
-    send_goal_options.feedback_callback =
-      [this](GoalHandleCoverage::SharedPtr, const std::shared_ptr<const NavigateCoverage::Feedback> feedback)
-      {
-        const auto & pt = feedback->current_pose.pose.position;
-        RCLCPP_INFO(this->get_logger(), "Current pose: %.2f, %.2f", pt.x, pt.y);
-
-        // Salva in un vettore per avere tutte le coordinate percorse
-        // traversed_points_.push_back({pt.x, pt.y});
-      };
-
-
     // Callback per il risultato finale della copertura
     send_goal_options.result_callback = 
       [this](const GoalHandleCoverage::WrappedResult & result) {
@@ -190,7 +151,6 @@ private:
   rclcpp_action::Client<NavigateCoverage>::SharedPtr coverage_client_;
   rclcpp_action::Client<NavigateToPose>::SharedPtr nav2_client_;
   rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr polygon_sub_;
-  rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr coverage_sub_;
   bool is_task_running_ = false;
 };
 
