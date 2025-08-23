@@ -9,7 +9,7 @@ twist_mux:
         topic   : /cmd_vel_joy
         timeout : 0.5
         priority: 10
-      navigation:
-        topic   : /cmd_vel
-        timeout : 0.5
-        priority: 100
+      # navigation:
+      #   topic   : /cmd_vel
+      #   timeout : 0.5
+      #   priority: 100

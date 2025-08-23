@@ -28,11 +28,13 @@ public:
     coverage_client_ = rclcpp_action::create_client<NavigateCoverage>(this, "navigate_complete_coverage");
     nav2_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
 
-    polygon_sub_ = this->create_subscription<geometry_msgs::msg::Polygon>(
-      "/coverage_zone", 10, std::bind(&CoverageNavigatorTester::polygonCallback, this, std::placeholders::_1));
-
     coverage_sub_ = this->create_subscription<geometry_msgs::msg::Polygon>(
       "/coverage_start", 10, std::bind(&CoverageNavigatorTester::coverageCallback, this, std::placeholders::_1));
+
+    auto qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable();
+    first_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+      "/coverage_first_pose", qos,
+      std::bind(&CoverageNavigatorTester::firstPoseCallback, this, std::placeholders::_1));
 
     RCLCPP_INFO(this->get_logger(), "Coverage tester node ready. Waiting for polygon on /coverage_zone.");
   }
@@ -51,34 +53,6 @@ private:
     return poly;
   }
 
-  // --- Logica principale ---
-
-  // 1. Callback che riceve il poligono e inizia la sequenza.
-  void polygonCallback(const geometry_msgs::msg::Polygon::SharedPtr msg)
-  {
-    if (is_task_running_) {
-      RCLCPP_WARN(this->get_logger(), "A task is already running. Ignoring new polygon.");
-      return;
-    }
-
-    if (msg->points.empty()) {
-      RCLCPP_WARN(this->get_logger(), "Received empty polygon, ignoring.");
-      return;
-    }
-
-    std::vector<std::array<double, 2>> field;
-    for (const auto &pt : msg->points) {
-      field.push_back({pt.x, pt.y});
-    }
-
-    RCLCPP_INFO(this->get_logger(), "Received polygon with %zu points. Starting navigation sequence.", field.size());
-    is_task_running_ = true;
-
-    // Inizia la prima azione della catena: andare al punto di partenza.
-    goToStartPoint(field);
-  }
-
-  // --- Nuova callback per /coverage_start ---
   void coverageCallback(const geometry_msgs::msg::Polygon::SharedPtr msg)
   {
     if (is_task_running_) {
@@ -91,7 +65,7 @@ private:
       return;
     }
 
-    std::vector<std::array<double, 2>> field;
+    field.clear();
     for (const auto &pt : msg->points) {
       field.push_back({pt.x, pt.y});
     }
@@ -100,53 +74,65 @@ private:
     is_task_running_ = true;
 
     // Parte subito con la copertura senza andare al punto di partenza
-    startCoverage(field);
+    startCoverage();
   }
 
-  // 2. Funzione che invia il goal per raggiungere il punto di partenza.
-  void goToStartPoint(const std::vector<std::array<double, 2>>& field)
+  void firstPoseCallback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
   {
-    if (!nav2_client_->wait_for_action_server(10s)) {
-        RCLCPP_ERROR(this->get_logger(), "Nav2 action server not available. Aborting task.");
+    auto fixed_pose = *msg;
+    fixed_pose.header.frame_id = "map";
+    first_pose_ = std::make_shared<geometry_msgs::msg::PoseStamped>(fixed_pose);
+    RCLCPP_INFO(this->get_logger(), "Received start pose: x=%.2f, y=%.2f (frame=%s)",
+                fixed_pose.pose.position.x, fixed_pose.pose.position.y,
+                fixed_pose.header.frame_id.c_str());
+  }
+
+  void goToFirstPose() {
+    if (is_task_running_) {
+      RCLCPP_WARN(this->get_logger(), "A task is already running. Ignoring first pose.");
+      return;
+    }
+
+    if (!first_pose_) {
+        RCLCPP_ERROR(get_logger(), "First pose not available yet!");
         is_task_running_ = false;
         return;
     }
 
+    is_task_running_ = true;
+
+    RCLCPP_INFO(this->get_logger(), "START navigation to FIRST pose");
+
+    // Creiamo il goal per navigare a questo punto
     auto goal_msg = NavigateToPose::Goal();
     goal_msg.pose.header.frame_id = "map";
     goal_msg.pose.header.stamp = this->now();
+    goal_msg.pose = *first_pose_;
 
-    double safe_margin = 0.0;
-    double entry_x = field[0][0] + safe_margin;
-    double entry_y = field[0][1] + safe_margin;
-
-    goal_msg.pose.pose.position.x = entry_x;
-    goal_msg.pose.pose.position.y = entry_y;
-    goal_msg.pose.pose.orientation.w = 1.0;
-
-    RCLCPP_INFO(this->get_logger(), "Sending goal to reach start point: (%.2f, %.2f)", entry_x, entry_y);
+    if (!nav2_client_->wait_for_action_server(10s)) {
+      RCLCPP_ERROR(this->get_logger(), "Nav2 action server not available. Aborting task.");
+      is_task_running_ = false;
+      return;
+    }
 
     auto send_goal_options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
-    
-    // **LA PARTE CRUCIALE**: La callback del risultato di questa azione
-    // innescherà l'azione successiva.
-    send_goal_options.result_callback = 
-      [this, field](const GoalHandlePose::WrappedResult & result) {
+
+    send_goal_options.result_callback =
+      [this](const GoalHandlePose::WrappedResult & result) {
         if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
-          RCLCPP_INFO(this->get_logger(), "Successfully reached start point!");
-          // Se ha avuto successo, avvia la copertura.
-          this->startCoverage(field);
+          RCLCPP_INFO(this->get_logger(), "Reached first coverage pose!");
+          startCoverage();
         } else {
-          RCLCPP_ERROR(this->get_logger(), "Failed to reach start point. Aborting task.");
-          this->is_task_running_ = false;
+          RCLCPP_ERROR(this->get_logger(), "Failed to reach first coverage pose.");
         }
+        is_task_running_ = false;
       };
 
     nav2_client_->async_send_goal(goal_msg, send_goal_options);
   }
 
-  // 3. Funzione che invia il goal per iniziare la copertura.
-  void startCoverage(const std::vector<std::array<double, 2>>& field)
+
+  void startCoverage()
   {
     if (!coverage_client_->wait_for_action_server(10s)) {
       RCLCPP_ERROR(this->get_logger(), "Coverage action server not available. Aborting task.");
@@ -162,26 +148,22 @@ private:
 
     auto send_goal_options = rclcpp_action::Client<NavigateCoverage>::SendGoalOptions();
     
-    send_goal_options.feedback_callback =
-      [this](GoalHandleCoverage::SharedPtr, const std::shared_ptr<const NavigateCoverage::Feedback> feedback)
-      {
-        const auto & pt = feedback->current_pose.pose.position;
-        RCLCPP_INFO(this->get_logger(), "Current pose: %.2f, %.2f", pt.x, pt.y);
-
-        // Salva in un vettore per avere tutte le coordinate percorse
-        // traversed_points_.push_back({pt.x, pt.y});
-      };
-
-
     // Callback per il risultato finale della copertura
     send_goal_options.result_callback = 
       [this](const GoalHandleCoverage::WrappedResult & result) {
         if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
           RCLCPP_INFO(this->get_logger(), "Coverage task completed successfully!");
+          this->is_task_running_ = false; 
         } else {
           RCLCPP_ERROR(this->get_logger(), "Coverage task failed or was canceled.");
+
+          // Hack per far partire la navigazione verso la prima posa
+          // Il CoverageServer invia la prima posa quando parte un tentativo di coverage.
+          // Faccio partire solo quando il coverage fallisce.
+          // Fa un bel po' schifo, ma è la soluzione più semplice.
+          this->is_task_running_ = false;
+          goToFirstPose();
         }
-        this->is_task_running_ = false; // La task è finita, pronto per la prossima.
       };
 
     coverage_client_->async_send_goal(goal_msg, send_goal_options);
@@ -189,9 +171,11 @@ private:
 
   rclcpp_action::Client<NavigateCoverage>::SharedPtr coverage_client_;
   rclcpp_action::Client<NavigateToPose>::SharedPtr nav2_client_;
-  rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr polygon_sub_;
   rclcpp::Subscription<geometry_msgs::msg::Polygon>::SharedPtr coverage_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr first_pose_sub_;
   bool is_task_running_ = false;
+  std::vector<std::array<double, 2>> field;
+  geometry_msgs::msg::PoseStamped::SharedPtr first_pose_ = nullptr;
 };
 
 int main(int argc, char ** argv)

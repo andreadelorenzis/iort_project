@@ -228,7 +228,7 @@ def generate_launch_description():
         joint_broad_spawner,
         ros_gz_bridge,
         ros_gz_image_bridge,
-        # step_controller_node,
+        step_controller_node,
         # nav2,
         slam_toolbox,
         # rviz_node,
