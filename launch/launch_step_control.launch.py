@@ -37,32 +37,40 @@ def generate_launch_description():
             remappings=[('/cmd_vel_out','/diff_cont/cmd_vel_unstamped')]
         )
 
-    default_world = os.path.join(
-        get_package_share_directory(package_name),
-        'worlds',
-        'empty.world'
-        )    
+    # default_world = os.path.join(
+    #     get_package_share_directory(package_name),
+    #     'worlds',
+    #     'empty.world'
+    #     )    
     
-    world = LaunchConfiguration('world')
-    world_arg = DeclareLaunchArgument(
-        'world',
-        default_value=default_world,
-        description='World to load'
-        )
+    # world = LaunchConfiguration('world')
+    # world_arg = DeclareLaunchArgument(
+    #     'world',
+    #     default_value=default_world,
+    #     description='World to load'
+    #     )
 
-    # Include the Gazebo launch file, provided by the ros_gz_sim package
-    gazebo = IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([os.path.join(
-                    get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')]),
-                    launch_arguments={'gz_args': ['-r -v4 ', world], 'on_exit_shutdown': 'true'}.items()
-             )
+    # # Include the Gazebo launch file, provided by the ros_gz_sim package
+    # gazebo = IncludeLaunchDescription(
+    #             PythonLaunchDescriptionSource([os.path.join(
+    #                 get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')]),
+    #                 launch_arguments={'gz_args': ['-r -v4 ', world], 'on_exit_shutdown': 'true'}.items()
+    #          )
 
-    # Run the spawner node from the ros_gz_sim package. The entity name doesn't really matter if you only have a single robot.
-    spawn_entity = Node(package='ros_gz_sim', executable='create',
-                        arguments=['-topic', 'robot_description',
-                                   '-name', 'my_bot',
-                                   '-z', '0.1'],
-                        output='screen')
+    spawn_entity = Node(
+        package='ros_gz_sim', 
+        executable='create',
+        arguments=[
+            '-topic', 'robot_description',
+            '-name', 'my_bot',
+            '-x', '0.0',
+            '-y', '0.0',
+            '-z', '0.1',
+            '-R', '0.0',
+            '-P', '0.0',
+            '-Y', '0.0'
+        ],
+        output='screen')
 
     diff_drive_spawner = Node(
         package="controller_manager",
@@ -144,12 +152,12 @@ def generate_launch_description():
         }.items()
     )
 
-    delayed_slam = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=diff_drive_spawner,
-            on_exit=[slam_toolbox]
-        )
-    )
+    # delayed_slam = RegisterEventHandler(
+    #     event_handler=OnProcessExit(
+    #         target_action=diff_drive_spawner,
+    #         on_exit=[slam_toolbox]
+    #     )
+    # )
 
     rviz_config_file = os.path.join(
         get_package_share_directory(package_name),
@@ -166,8 +174,29 @@ def generate_launch_description():
     )
 
     delayed_rviz = TimerAction(
-        period=5.0,   # aspetta 5 secondi
+        period=5.0,   
         actions=[rviz_node]
+    )
+
+    # delayed_slam = TimerAction(
+    #     period=10.0,   
+    #     actions=[slam_toolbox]
+    # )
+
+    delayed_block = TimerAction(
+        period=15.0, 
+        actions=[
+            rsp,
+            spawn_entity,
+            joystick,
+            twist_mux,
+            joint_broad_spawner,
+            diff_drive_spawner,
+            step_controller_node,
+            nav2,
+            slam_toolbox,
+            delayed_rviz
+        ]
     )
 
     # Launch them all!
@@ -175,8 +204,8 @@ def generate_launch_description():
         rsp,
         joystick,
         twist_mux,
-        world_arg,
-        gazebo,
+        # world_arg,
+        # gazebo,
         spawn_entity,
         diff_drive_spawner,
         joint_broad_spawner,
@@ -185,6 +214,13 @@ def generate_launch_description():
         step_controller_node,
         nav2,
         slam_toolbox,
-        # rviz_node,
         delayed_rviz
     ])
+
+    # return LaunchDescription([
+    #     world_arg,
+    #     gazebo,
+    #     ros_gz_bridge,
+    #     ros_gz_image_bridge,
+    #     delayed_block
+    # ])
