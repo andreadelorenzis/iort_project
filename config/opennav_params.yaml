@@ -1,10 +1,24 @@
+# # parametri DEMO
+# coverage_server:
+#   ros__parameters:
+#     use_sim_time: True
+#     default_headland_width: 0.25
+#     robot_width: 0.7
+#     operation_width: 0.7
+#     min_turning_radius: 0.35
+#     linear_curv_change: 200.0
+#     coordinates_in_cartesian_frame: true
+#     default_allow_overlap: false
+#     default_swath_angle_type: "SET_ANGLE"
+#     default_swath_angle: 0.0 # We know its aligned for the demo
+
 coverage_server:
   ros__parameters:
     use_sim_time: True
     default_headland_width: 0.25
-    robot_width: 0.7
-    operation_width: 0.7
-    min_turning_radius: 0.35
+    robot_width: 0.3
+    operation_width: 0.5
+    min_turning_radius: 0.20
     linear_curv_change: 200.0
     coordinates_in_cartesian_frame: true
     default_allow_overlap: false
@@ -128,7 +142,7 @@ controller_server:
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
       desired_linear_vel: 0.5
-      lookahead_dist: 0.6
+      lookahead_dist: 0.4
       min_lookahead_dist: 0.3
       max_lookahead_dist: 0.9
       lookahead_time: 1.5
@@ -144,7 +158,7 @@ controller_server:
       use_cost_regulated_linear_velocity_scaling: false
       regulated_linear_scaling_min_radius: 0.9
       regulated_linear_scaling_min_speed: 0.25
-      use_rotate_to_heading: false  # allows to follow coverage path better in sharper turns
+      use_rotate_to_heading: true  # allows to follow coverage path better in sharper turns
       allow_reversing: false
       rotate_to_heading_min_angle: 0.785
       max_angular_accel: 3.2
@@ -163,7 +177,8 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.05
-      footprint: "[ [0.5, 0.25], [0.5, -0.25], [-0.5, -0.25], [-0.5, 0.25] ]"
+      # footprint: "[ [0.5, 0.25], [0.5, -0.25], [-0.5, -0.25], [-0.5, 0.25] ]"
+      footprint: "[ [0.26, 0.15], [0.26, -0.15], [-0.17, -0.15], [-0.17, 0.15] ]"
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"

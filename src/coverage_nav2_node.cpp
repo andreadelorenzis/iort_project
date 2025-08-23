@@ -73,7 +73,7 @@ private:
     RCLCPP_INFO(this->get_logger(), "Received coverage polygon with %zu points. Starting coverage directly.", field.size());
     is_task_running_ = true;
 
-    // Parte subito con la copertura senza andare al punto di partenza
+    numAttempts = 0;
     startCoverage();
   }
 
@@ -124,6 +124,12 @@ private:
           startCoverage();
         } else {
           RCLCPP_ERROR(this->get_logger(), "Failed to reach first coverage pose.");
+
+          // Prova comunque a fare startCoverage.  Mal che vada il coverage server risponde di no
+          if (numAttempts < 3) {
+            numAttempts++;
+            startCoverage();
+          }
         }
         is_task_running_ = false;
       };
@@ -176,6 +182,7 @@ private:
   bool is_task_running_ = false;
   std::vector<std::array<double, 2>> field;
   geometry_msgs::msg::PoseStamped::SharedPtr first_pose_ = nullptr;
+  int numAttempts = 0;
 };
 
 int main(int argc, char ** argv)

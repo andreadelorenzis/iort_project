@@ -71,46 +71,38 @@ public:
             RCLCPP_INFO(this->get_logger(), "Publisher on /diff_cont/cmd_vel created");
         }
 
+        lastTime_ = clock_->now();
 
         subscription_ = this->create_subscription<geometry_msgs::msg::Twist>(
         "/cmd_vel", rclcpp::QoS(10).reliable(),
         std::bind(&StepController::cmd_callback, this, _1));
         RCLCPP_INFO(this->get_logger(), "Subscription on /cmd_vel created!");
 
-        publish_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(50),
-            std::bind(&StepController::send_command, this));
+        publish_timer_ = this->create_wall_timer(std::chrono::milliseconds(publish_rate), std::bind(&StepController::send_command, this));
 
+        // In constructor
         watchdog_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(100),
-            std::bind(&StepController::check_watchdog, this));
+            std::chrono::milliseconds(500),
+            [this]() {
+                if ((clock_->now() - lastTime_).seconds() > 0.5) {
+                    if (current_state != RobotState::STOP) {
+                        current_state = RobotState::STOP;
+                        RCLCPP_WARN(this->get_logger(), "Watchdog triggered: STOP");
+                    }
+                }
+            }
+        );
 
-        last_cmd_time_ = now();
-        current_state = RobotState::STOP;
     }
 
-    private:
-
-    void cmd_callback(const geometry_msgs::msg::Twist::SharedPtr msg)
+    ~StepController()
     {
-        last_cmd_time_ = now();
-        const double EPS = 1e-3;
-        RobotState new_state = RobotState::STOP;
-
-        double abs_linear  = std::abs(msg->linear.x);
-        double abs_angular = std::abs(msg->angular.z);
-
-        if (std::abs(msg->linear.x) > EPS &&  abs_linear > abs_angular) {
-            new_state = (msg->linear.x > 0) ? RobotState::FORWARD : RobotState::BACKWARD;
-        } else if (std::abs(msg->angular.z) > EPS && abs_linear <= abs_angular) {
-            new_state = (msg->angular.z > 0) ? RobotState::LEFT : RobotState::RIGHT;
-        }
-
-        if (new_state != current_state) {
-            current_state = new_state;
-            RCLCPP_INFO(this->get_logger(), "Current state: %s", state_to_string(current_state).c_str());
+        if (sock_ >= 0) {
+            close(sock_);
         }
     }
+
+private:
 
     void send_command()
     {
@@ -128,13 +120,38 @@ public:
         }
     }
 
-    void check_watchdog()
+
+    void cmd_callback(const geometry_msgs::msg::Twist::SharedPtr msg)
     {
-        auto now_time = now();
-        auto dt = (now_time - last_cmd_time_).seconds();
-        if (dt > 0.2 && current_state != RobotState::STOP) { // 200ms timeout
-            current_state = RobotState::STOP;
-            RCLCPP_WARN(this->get_logger(), "Watchdog triggered: stopping robot");
+        rclcpp::Time now = clock_->now();
+        rclcpp::Duration dt = (lastTime_.nanoseconds() > 0) 
+            ? now - lastTime_ : rclcpp::Duration(0, 0);
+        this->lastTime_ = now;
+
+        // Cap dt at:
+        // 1 for commands sents manually (very low frequency)
+        // 0.01 for very fast frequencies (>20hz)
+        double dt_capped = std::clamp(dt.seconds(), 0.01, 1.0);
+
+        acc_linear_x += msg->linear.x * dt_capped;
+        acc_angular_z += msg->angular.z * dt_capped;
+
+        RobotState new_state = current_state;
+        const double EPS = 1e-3;
+
+        if (std::abs(acc_angular_z) >= ANGULAR_Z_THREESHOLD) {
+            new_state = (acc_angular_z > 0.0) ? RobotState::LEFT : RobotState::RIGHT;
+            acc_angular_z = 0.0;
+        } else if (std::abs(acc_linear_x) >= LINEAR_X_THREESHOLD) {
+            new_state = (acc_linear_x > 0.0) ? RobotState::FORWARD : RobotState::BACKWARD;
+            acc_linear_x = 0.0;
+        }else if (std::abs(msg->angular.z) < EPS && std::abs(msg->linear.x) < EPS) {
+            new_state = RobotState::STOP;
+        }
+
+        if (new_state != current_state) {
+            current_state = new_state;
+            RCLCPP_INFO(this->get_logger(), "Current state: %s", state_to_string(current_state).c_str());
         }
     }
 
@@ -149,36 +166,49 @@ public:
         return "UNKNOWN";
     }
 
+    const int publish_rate = 300; // ms
 
+    const float ANGULAR_Z_THREESHOLD = 0.8; 
+    const float LINEAR_X_THREESHOLD = 1.5; 
     const std::map<RobotState, std::pair<double,double>> command_map = {
-        {RobotState::FORWARD,  {0.6,  0.0}},
-        {RobotState::BACKWARD, {-0.6, 0.0}},
-        {RobotState::LEFT,     {0.0,  0.9}},
-        {RobotState::RIGHT,    {0.0, -0.9}},
+        {RobotState::FORWARD,  {0.8,  0.0}},
+        {RobotState::BACKWARD, {-0.8, 0.0}},
+        {RobotState::LEFT,     {0.0,  1.5}},
+        {RobotState::RIGHT,    {0.0, -1.5}},
         {RobotState::STOP,     {0.0,  0.0}}
     };
+    float acc_linear_x = 0;
+    float acc_angular_z = 0;
+    int sock_{-1};
+    bool simulation_;
+    rclcpp::Clock::SharedPtr clock_;
+
 
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr subscription_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_;
+    rclcpp::Time lastTime_{0, 0, RCL_ROS_TIME};
+
+    std::deque<std::string> command_queue_;
     rclcpp::TimerBase::SharedPtr publish_timer_;
-    
-    rclcpp::Clock::SharedPtr clock_;
-    bool simulation_;
-    RobotState current_state;
     rclcpp::TimerBase::SharedPtr watchdog_timer_;
-    rclcpp::Time last_cmd_time_;
+
+    RobotState current_state = RobotState::STOP;
 };
   
 int main(int argc, char * argv[])
 {
     rclcpp::init(argc, argv);
+
     rclcpp::NodeOptions options;
     options.parameter_overrides({
         rclcpp::Parameter("use_sim_time", true)
     });
+
     auto node = std::make_shared<StepController>(options);
+
     rclcpp::spin(node);
     rclcpp::shutdown();
+
     return 0;
 }
 
