@@ -56,7 +56,7 @@ def generate_launch_description():
             package="twist_mux",
             executable="twist_mux",
             parameters=[twist_mux_params, {'use_sim_time': True}],
-            remappings=[('/cmd_vel_out','/diff_cont/cmd_vel_unstamped')]
+            remappings=[('/cmd_vel_out','/diff_cont/cmd_vel')]
         )
 
     # Start the simulation
@@ -171,7 +171,11 @@ def generate_launch_description():
     rviz_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(nav2_bringup_dir, 'launch', 'rviz_launch.py')),
-        launch_arguments={'namespace': '', 'rviz_config': rviz_config}.items())
+        launch_arguments={
+            'namespace': '', 
+            'rviz_config': rviz_config,
+            'use_sim_time': 'true'
+        }.items())
 
     delayed_rviz = TimerAction(
         period=5.0,   # aspetta 5 secondi
@@ -228,7 +232,7 @@ def generate_launch_description():
         joint_broad_spawner,
         ros_gz_bridge,
         ros_gz_image_bridge,
-        # step_controller_node,
+        step_controller_node,
         # nav2,
         slam_toolbox,
         # rviz_node,

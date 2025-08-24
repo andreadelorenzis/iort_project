@@ -48,9 +48,9 @@ bt_navigator:
     action_server_result_timeout: 900.0
     navigators: ["navigate_to_pose", "navigate_through_poses", "navigate_complete_coverage"]
     navigate_to_pose:
-      plugin: "nav2_bt_navigator/NavigateToPoseNavigator"
+      plugin: "nav2_bt_navigator::NavigateToPoseNavigator"
     navigate_through_poses:
-      plugin: "nav2_bt_navigator/NavigateThroughPosesNavigator"
+      plugin: "nav2_bt_navigator::NavigateThroughPosesNavigator"
     navigate_complete_coverage:
       plugin: "opennav_coverage_navigator/CoverageNavigator"
     # 'default_nav_through_poses_bt_xml' and 'default_nav_to_pose_bt_xml' are use defaults:
@@ -58,63 +58,63 @@ bt_navigator:
     # nav2_bt_navigator/navigate_through_poses_w_replanning_and_recovery.xml
     # They can be set here or via a RewrittenYaml remap from a parent launch file to Nav2.
     plugin_lib_names:
-      - nav2_compute_path_to_pose_action_bt_node
-      - nav2_compute_path_through_poses_action_bt_node
-      - nav2_smooth_path_action_bt_node
-      - nav2_follow_path_action_bt_node
-      - nav2_spin_action_bt_node
-      - nav2_wait_action_bt_node
-      - nav2_assisted_teleop_action_bt_node
-      - nav2_back_up_action_bt_node
-      - nav2_drive_on_heading_bt_node
-      - nav2_clear_costmap_service_bt_node
-      - nav2_is_stuck_condition_bt_node
-      - nav2_goal_reached_condition_bt_node
-      - nav2_goal_updated_condition_bt_node
-      - nav2_globally_updated_goal_condition_bt_node
-      - nav2_is_path_valid_condition_bt_node
-      - nav2_are_error_codes_active_condition_bt_node
-      - nav2_would_a_controller_recovery_help_condition_bt_node
-      - nav2_would_a_planner_recovery_help_condition_bt_node
-      - nav2_would_a_smoother_recovery_help_condition_bt_node
-      - nav2_initial_pose_received_condition_bt_node
-      - nav2_reinitialize_global_localization_service_bt_node
-      - nav2_rate_controller_bt_node
-      - nav2_distance_controller_bt_node
-      - nav2_speed_controller_bt_node
-      - nav2_truncate_path_action_bt_node
-      - nav2_truncate_path_local_action_bt_node
-      - nav2_goal_updater_node_bt_node
-      - nav2_recovery_node_bt_node
-      - nav2_pipeline_sequence_bt_node
-      - nav2_round_robin_node_bt_node
       - opennav_compute_complete_coverage_action_bt_node
       - opennav_cancel_complete_coverage_action_bt_node
-      - nav2_transform_available_condition_bt_node
-      - nav2_time_expired_condition_bt_node
-      - nav2_path_expiring_timer_condition
-      - nav2_distance_traveled_condition_bt_node
-      - nav2_single_trigger_bt_node
-      - nav2_goal_updated_controller_bt_node
-      - nav2_is_battery_low_condition_bt_node
-      - nav2_navigate_through_poses_action_bt_node
-      - nav2_navigate_to_pose_action_bt_node
-      - nav2_remove_passed_goals_action_bt_node
-      - nav2_planner_selector_bt_node
-      - nav2_controller_selector_bt_node
-      - nav2_goal_checker_selector_bt_node
-      - nav2_controller_cancel_bt_node
-      - nav2_path_longer_on_approach_bt_node
-      - nav2_wait_cancel_bt_node
-      - nav2_spin_cancel_bt_node
-      - nav2_back_up_cancel_bt_node
-      - nav2_assisted_teleop_cancel_bt_node
-      - nav2_drive_on_heading_cancel_bt_node
-      - nav2_is_battery_charging_condition_bt_node
-    error_code_names:
-      - compute_path_error_code
-      - follow_path_error_code
-      - compute_coverage_error_code
+      # - nav2_compute_path_to_pose_action_bt_node
+      # - nav2_navigate_through_poses_action_bt_node
+      # - nav2_navigate_to_pose_action_bt_node
+      # - nav2_compute_path_through_poses_action_bt_node
+      # - nav2_smooth_path_action_bt_node
+      # - nav2_follow_path_action_bt_node
+      # - nav2_spin_action_bt_node
+      # - nav2_wait_action_bt_node
+      # - nav2_assisted_teleop_action_bt_node
+      # - nav2_back_up_action_bt_node
+      # - nav2_drive_on_heading_bt_node
+      # - nav2_clear_costmap_service_bt_node
+      # - nav2_is_stuck_condition_bt_node
+      # - nav2_goal_reached_condition_bt_node
+      # - nav2_goal_updated_condition_bt_node
+      # - nav2_globally_updated_goal_condition_bt_node
+      # - nav2_is_path_valid_condition_bt_node
+      # - nav2_are_error_codes_active_condition_bt_node
+      # - nav2_would_a_controller_recovery_help_condition_bt_node
+      # - nav2_would_a_planner_recovery_help_condition_bt_node
+      # - nav2_would_a_smoother_recovery_help_condition_bt_node
+      # - nav2_initial_pose_received_condition_bt_node
+      # - nav2_reinitialize_global_localization_service_bt_node
+      # - nav2_rate_controller_bt_node
+      # - nav2_distance_controller_bt_node
+      # - nav2_speed_controller_bt_node
+      # - nav2_truncate_path_action_bt_node
+      # - nav2_truncate_path_local_action_bt_node
+      # - nav2_goal_updater_node_bt_node
+      # - nav2_recovery_node_bt_node
+      # - nav2_pipeline_sequence_bt_node
+      # - nav2_round_robin_node_bt_node
+      # - nav2_transform_available_condition_bt_node
+      # - nav2_time_expired_condition_bt_node
+      # - nav2_path_expiring_timer_condition
+      # - nav2_distance_traveled_condition_bt_node
+      # - nav2_single_trigger_bt_node
+      # - nav2_goal_updated_controller_bt_node
+      # - nav2_is_battery_low_condition_bt_node
+      # - nav2_remove_passed_goals_action_bt_node
+      # - nav2_planner_selector_bt_node
+      # - nav2_controller_selector_bt_node
+      # - nav2_goal_checker_selector_bt_node
+      # - nav2_controller_cancel_bt_node
+      # - nav2_path_longer_on_approach_bt_node
+      # - nav2_wait_cancel_bt_node
+      # - nav2_spin_cancel_bt_node
+      # - nav2_back_up_cancel_bt_node
+      # - nav2_assisted_teleop_cancel_bt_node
+      # - nav2_drive_on_heading_cancel_bt_node
+      # - nav2_is_battery_charging_condition_bt_node
+    # error_code_prefixes:
+    #   - compute_path
+    #   - follow_path
+    #   - compute_coverage
  
 controller_server:
   ros__parameters:
@@ -141,12 +141,12 @@ controller_server:
     # RPP parameters
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.5
+      desired_linear_vel: 1.0
       lookahead_dist: 0.4
       min_lookahead_dist: 0.3
       max_lookahead_dist: 0.9
       lookahead_time: 1.5
-      rotate_to_heading_angular_vel: 1.8
+      rotate_to_heading_angular_vel: 3.5
       use_velocity_scaled_lookahead_dist: true
       min_approach_linear_velocity: 0.05
       approach_velocity_scaling_dist: 0.6
@@ -160,8 +160,8 @@ controller_server:
       regulated_linear_scaling_min_speed: 0.25
       use_rotate_to_heading: true  # allows to follow coverage path better in sharper turns
       allow_reversing: false
-      rotate_to_heading_min_angle: 0.785
-      max_angular_accel: 3.2
+      rotate_to_heading_min_angle: 0.1
+      max_angular_accel: 5.0
       max_robot_pose_search_dist: 10.0
       use_interpolation: true
 
@@ -220,7 +220,7 @@ planner_server:
     expected_planner_frequency: 20.0
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"
+      plugin: "nav2_navfn_planner::NavfnPlanner"
       tolerance: 0.5
       use_astar: false
       allow_unknown: true
@@ -231,10 +231,10 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [0.5, 0.0, 2.0]
-    min_velocity: [-0.5, 0.0, -2.0]
-    max_accel: [2.5, 0.0, 5.2]
-    max_decel: [-2.5, 0.0, -5.2]
+    max_velocity: [1.0, 0.0, 3.0]
+    min_velocity: [-1.0, 0.0, -3.0]
+    max_accel: [5.0, 0.0, 8.0]
+    max_decel: [-5.0, 0.0, -8.0]
     odom_topic: "odom"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]

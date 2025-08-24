@@ -56,6 +56,13 @@ def generate_launch_description():
         ],
         output='screen'
     )
+        # start choords map house
+        #     '-x', '-8.5',
+            # '-y', '-1.0',
+            # '-z', '0.1',
+            # '-R', '0.0',
+            # '-P', '0.0',
+            # '-Y', '0.0'
 
     # -----------------------------
     # ROS2 Control node
