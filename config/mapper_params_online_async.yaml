@@ -24,6 +24,7 @@ slam_toolbox:
     # will use pose
     # map_file_name: /home/andre/dev_ws/coverage_map
     # map_file_name: /home/andre/dev_ws/my_map_serial
+    # map_file_name: /home/andre/dev_ws/house_map_serial
     # map_start_pose: [3.0, 3.0, 0.0]
     # map_start_pose: [0.0, 0.0, 0.0]
     map_start_at_dock: true
