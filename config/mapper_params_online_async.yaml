@@ -14,7 +14,7 @@ slam_toolbox:
     map_frame: map
     base_frame: base_footprint
     scan_topic: /scan
-    mode: mapper #localization
+    mode: localization #mapper
 
     # odom_topic: /odom
     # use_odom: true
@@ -22,9 +22,9 @@ slam_toolbox:
     # if you'd like to immediately start continuing a map at a given pose
     # or at the dock, but they are mutually exclusive, if pose is given
     # will use pose
-    # map_file_name: /home/andre/dev_ws/coverage_map
+    map_file_name: /home/andre/dev_ws/coverage_map
     # map_file_name: /home/andre/dev_ws/my_map_serial
-    # map_start_pose: [3.0, 3.0, 0.0]
+    map_start_pose: [3.0, 3.0, 0.0]
     # map_start_pose: [0.0, 0.0, 0.0]
     map_start_at_dock: true
 
