@@ -26,18 +26,10 @@ def generate_launch_description():
         'config',
         'twist_mux.yaml'
     )
-    signals_dir = os.path.join(
+    rviz_config = os.path.join(
         get_package_share_directory(package_name),
         'config',
-        'signals'
-    )
-
-
-    # Start robot state publisher
-    rsp = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([os.path.join(
-            get_package_share_directory(package_name),'launch','rsp.launch.py'
-        )])
+        'main.rviz',
     )
 
     # Start multiplexer
@@ -47,14 +39,6 @@ def generate_launch_description():
             parameters=[twist_mux_params, {'use_sim_time': False}],
             remappings=[('/cmd_vel_out','/diff_cont/cmd_vel')]
         )
-
-    # Start step controller
-    # step_controller_node = Node(
-    #     package=package_name,
-    #     executable='step_controller_node',
-    #     parameters=[{'simulation': False}, {'use_sim_time': False}, {'signals_dir': signals_dir}],
-    #     output='screen'
-    # )
 
     ldlidar_slam = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -80,6 +64,14 @@ def generate_launch_description():
         output='screen'
     )
     
+    rviz_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(nav2_bringup_dir, 'launch', 'rviz_launch.py')),
+        launch_arguments={
+            'namespace': '', 
+            'rviz_config': rviz_config,
+            'use_sim_time': 'true'
+        }.items())
 
     # Launch them all!
     return LaunchDescription([
@@ -88,5 +80,6 @@ def generate_launch_description():
         # step_controller_node,
         # ldlidar_slam,
         bringup_cmd,
-        coverage_node
+        coverage_node,
+        rviz_cmd
     ])
