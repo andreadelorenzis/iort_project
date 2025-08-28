@@ -51,15 +51,22 @@ public:
         this->declare_parameter<std::string>("signals_dir", "");
         signals_dir_path_ = this->get_parameter("signals_dir").as_string();
 
-        RCLCPP_INFO(this->get_logger(), "Percorso file IR: %s", signals_dir_path_.c_str());
-
         // ir_signals[RobotState::FORWARD]  = read_ir_from_file(signals_dir_path + "/ir_forward.txt");
         // ir_signals[RobotState::BACKWARD] = read_ir_from_file(signals_dir_path + "/ir_backward.txt");
         // ir_signals[RobotState::LEFT]     = read_ir_from_file(signals_dir_path + "/ir_left.txt");
         // ir_signals[RobotState::RIGHT]    = read_ir_from_file(signals_dir_path + "/ir_right.txt");
         
         const std::string ir_file = signals_dir_path_ + "/ir_forward.txt";
+        RCLCPP_INFO(this->get_logger(), "Percorso file IR: %s", ir_file.c_str());
+
         std::vector<IRSignal> raw_signal = read_ir_from_file(ir_file);
+
+// DEBUG: stampo il contenuto dell'array letto
+RCLCPP_INFO(this->get_logger(), "Segnale IR letto dal file (%zu elementi):", raw_signal.size());
+for (size_t i = 0; i < raw_signal.size(); ++i) {
+    RCLCPP_INFO(this->get_logger(), "[%zu] type: %s, duration: %d",
+                i, raw_signal[i].type.c_str(), raw_signal[i].duration);
+}
 
         if (!raw_signal.empty()) {
             int pi = pigpio_start(NULL, NULL);
