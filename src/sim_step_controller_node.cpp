@@ -16,6 +16,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+using std::placeholders::_1;
+
 enum class RobotState {
     STOP,
     FORWARD,
