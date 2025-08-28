@@ -15,10 +15,17 @@
 #include "easywsclient.hpp"
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <vector>
+#include <fstream>
+#include <map>
 #ifdef BUILD_FOR_ROBOT
 #include <pigpiod_if2.h>
 #endif
 
+struct IRSignal {
+    std::string type; // "pulse" o "space"
+    int duration;     // microsecondi
+};
 
 enum class RobotState {
     STOP,
@@ -37,7 +44,7 @@ public:
         this->declare_parameter<std::string>("signals_dir", "");
         signals_dir_path_ = this->get_parameter("signals_dir").as_string();
 
-        RCLCPP_INFO(this->get_logger(), "Percorso file IR: %s", ir_file_path_.c_str());
+        RCLCPP_INFO(this->get_logger(), "Percorso file IR: %s", signals_dir_path_.c_str());
 
         // ir_signals[RobotState::FORWARD]  = read_ir_from_file(signals_dir_path + "/ir_forward.txt");
         // ir_signals[RobotState::BACKWARD] = read_ir_from_file(signals_dir_path + "/ir_backward.txt");
@@ -102,10 +109,7 @@ public:
 
     void send_command()
     {
-        if (ws) {
-            ws->send(state_to_string(current_state));
-            ws->poll();
-        }
+
     }
 
     void check_watchdog()
