@@ -50,33 +50,20 @@ public:
     {
         this->declare_parameter<std::string>("signals_dir", "");
         signals_dir_path_ = this->get_parameter("signals_dir").as_string();
+        RCLCPP_INFO(this->get_logger(), "Signals dir path: %s", signals_dir_path_.c_str());
 
-        // ir_signals[RobotState::FORWARD]  = read_ir_from_file(signals_dir_path + "/ir_forward.txt");
-        // ir_signals[RobotState::BACKWARD] = read_ir_from_file(signals_dir_path + "/ir_backward.txt");
-        // ir_signals[RobotState::LEFT]     = read_ir_from_file(signals_dir_path + "/ir_left.txt");
-        // ir_signals[RobotState::RIGHT]    = read_ir_from_file(signals_dir_path + "/ir_right.txt");
-        
-        const std::string ir_file = signals_dir_path_ + "/ir_forward.txt";
-        RCLCPP_INFO(this->get_logger(), "Percorso file IR: %s", ir_file.c_str());
+        ir_signals[RobotState::FORWARD]  = read_ir_from_file(signals_dir_path + "/ir_forward.txt");
+        ir_signals[RobotState::BACKWARD] = read_ir_from_file(signals_dir_path + "/ir_backward.txt");
+        ir_signals[RobotState::LEFT]     = read_ir_from_file(signals_dir_path + "/ir_left.txt");
+        ir_signals[RobotState::RIGHT]    = read_ir_from_file(signals_dir_path + "/ir_right.txt");
 
-        std::vector<IRSignal> raw_signal = read_ir_from_file(ir_file);
-
-// DEBUG: stampo il contenuto dell'array letto
-RCLCPP_INFO(this->get_logger(), "Segnale IR letto dal file (%zu elementi):", raw_signal.size());
-for (size_t i = 0; i < raw_signal.size(); ++i) {
-    RCLCPP_INFO(this->get_logger(), "[%zu] type: %s, duration: %d",
-                i, raw_signal[i].type.c_str(), raw_signal[i].duration);
-}
-
+        pi = pigpio_start(NULL, NULL);
+        if (pi < 0) {
+            RCLCPP_ERROR(this->get_logger(), "Error during connection to pigpiod");
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Connected to pigpio deamon!");
+        }
         if (!raw_signal.empty()) {
-            int pi = pigpio_start(NULL, NULL);
-            if (pi < 0) {
-                RCLCPP_ERROR(this->get_logger(), "Impossibile connettersi a pigpiod");
-            } else {
-                send_raw_wave(pi, raw_signal, IR_TX_PIN, CARRIER_FREQ, DUTY_CYCLE);
-                pigpio_stop(pi);
-                RCLCPP_INFO(this->get_logger(), "Segnale IR trasmesso!");
-            }
         } else {
             RCLCPP_WARN(this->get_logger(), "Segnale IR vuoto, niente da trasmettere");
         }
@@ -87,7 +74,7 @@ for (size_t i = 0; i < raw_signal.size(); ++i) {
         RCLCPP_INFO(this->get_logger(), "Subscription on /cmd_vel created!");
 
         publish_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(50),
+            std::chrono::milliseconds(100),
             std::bind(&StepController::send_command, this));
 
         watchdog_timer_ = this->create_wall_timer(
@@ -96,6 +83,10 @@ for (size_t i = 0; i < raw_signal.size(); ++i) {
 
         last_cmd_time_ = now();
         current_state = RobotState::STOP;
+    }
+
+    ~StepController() {
+        pigpio_stop(pi);
     }
 
     private:
@@ -123,7 +114,23 @@ for (size_t i = 0; i < raw_signal.size(); ++i) {
 
     void send_command()
     {
-
+        std::vector<IRSignal> signal;
+        switch(current_state)
+        {
+        case RobotState::FORWARD:
+            signal = ir_signals[RobotState::FORWARD];
+            break;
+        case RobotState::LEFT:
+            signal = ir_signals[RobotState::LEFT];
+            break;
+        case RobotState::RIGHT:
+            signal = ir_signals[RobotState::RIGHT];
+            break;
+        case RobotState::STOP:
+        default:
+            break;
+        }
+        send_raw_wave(pi, signal, IR_TX_PIN, CARRIER_FREQ, DUTY_CYCLE);
     }
 
     void check_watchdog()
@@ -222,6 +229,7 @@ for (size_t i = 0; i < raw_signal.size(); ++i) {
 
     std::string signals_dir_path_;
     std::map<RobotState, std::vector<IRSignal>> ir_signals;
+    int pi;
 };
   
 int main(int argc, char * argv[])

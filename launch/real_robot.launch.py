@@ -15,23 +15,11 @@ from launch.event_handlers import OnProcessExit, OnProcessStart
 
 def generate_launch_description():
     package_name='vacuum_bot'
-    nav2_bringup_dir = get_package_share_directory('nav2_bringup')
-    coverage_config_file = os.path.join(
-        get_package_share_directory(package_name),
-        'config',
-        'opennav_params.yaml'
-    )
-    twist_mux_params = os.path.join(
-        get_package_share_directory(package_name),
-        'config',
-        'twist_mux.yaml'
-    )
     signals_dir = os.path.join(
         get_package_share_directory(package_name),
         'config',
         'signals'
     )
-
 
     # Start robot state publisher
     rsp = IncludeLaunchDescription(
@@ -40,19 +28,12 @@ def generate_launch_description():
         )])
     )
 
-    # Start multiplexer
-    twist_mux = Node(
-            package="twist_mux",
-            executable="twist_mux",
-            parameters=[twist_mux_params, {'use_sim_time': False}],
-            remappings=[('/cmd_vel_out','/diff_cont/cmd_vel')]
-        )
 
     # Start step controller
     step_controller_node = Node(
         package=package_name,
-        executable='step_controller_node',
-        parameters=[{'simulation': False}, {'use_sim_time': False}, {'signals_dir': signals_dir}],
+        executable='real_step_controller_node',
+        parameters=[{'signals_dir': signals_dir}],
         output='screen'
     )
 
@@ -63,30 +44,9 @@ def generate_launch_description():
                          'ldlidar_slam.launch.py'))
         )
 
-    # start nav2/OpenNAV
-    bringup_cmd = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory(package_name), 
-                         'launch',
-                         'opennav_bringup_launch.py')),
-        launch_arguments={'use_sim_time': 'false', 'params_file': coverage_config_file}.items())
-
-
-    # Start the coverage node
-    coverage_node = Node(
-        package=package_name,
-        executable='coverage_nav2_node',
-        emulate_tty=True,
-        output='screen'
-    )
-    
-
     # Launch them all!
     return LaunchDescription([
         rsp,
-        twist_mux,
         step_controller_node,
         ldlidar_slam,
-        bringup_cmd,
-        coverage_node
     ])
