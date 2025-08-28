@@ -13,13 +13,12 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include "easywsclient.hpp"
-
 #include <arpa/inet.h>
 #include <unistd.h>
+#ifdef BUILD_FOR_ROBOT
+#include <pigpiod_if2.h>
+#endif
 
-using std::placeholders::_1;
-using easywsclient::WebSocket;
-static WebSocket::pointer ws = NULL;
 
 enum class RobotState {
     STOP,
@@ -35,43 +34,31 @@ public:
     StepController(const rclcpp::NodeOptions & options)
     : Node("step_controller", options)
     {
-        // Parameters for ESP32 connection
-        this->declare_parameter<bool>("simulation", true);
-        simulation_ = this->get_parameter("simulation").as_bool();
+        this->declare_parameter<std::string>("signals_dir", "");
+        signals_dir_path_ = this->get_parameter("signals_dir").as_string();
 
-        if (!simulation_) {
-            clock_ = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
+        RCLCPP_INFO(this->get_logger(), "Percorso file IR: %s", ir_file_path_.c_str());
 
-            this->declare_parameter<std::string>("esp32_ip", "192.168.1.13");
-            this->declare_parameter<int>("esp32_port", 80);
-            auto ip = this->get_parameter("esp32_ip").as_string();
-            auto port = this->get_parameter("esp32_port").as_int();
+        // ir_signals[RobotState::FORWARD]  = read_ir_from_file(signals_dir_path + "/ir_forward.txt");
+        // ir_signals[RobotState::BACKWARD] = read_ir_from_file(signals_dir_path + "/ir_backward.txt");
+        // ir_signals[RobotState::LEFT]     = read_ir_from_file(signals_dir_path + "/ir_left.txt");
+        // ir_signals[RobotState::RIGHT]    = read_ir_from_file(signals_dir_path + "/ir_right.txt");
+        
+        const std::string ir_file = signals_dir_path_ + "/ir_forward.txt";
+        std::vector<IRSignal> raw_signal = read_ir_from_file(ir_file);
 
-            RCLCPP_INFO(this->get_logger(), "Connecting to ESP32 at %s:%ld", ip.c_str(), port);
-
-            std::stringstream url;
-            url << "ws://" << ip << ":" << port;
-            ws = WebSocket::from_url(url.str());
-            if (!ws) {
-                RCLCPP_ERROR(this->get_logger(), "Failed to connect to ESP32 at %s:%ld",
-                            ip.c_str(), port);
-                throw std::runtime_error("ESP32 connection failed");
+        if (!raw_signal.empty()) {
+            int pi = pigpio_start(NULL, NULL);
+            if (pi < 0) {
+                RCLCPP_ERROR(this->get_logger(), "Impossibile connettersi a pigpiod");
+            } else {
+                send_raw_wave(pi, raw_signal, IR_TX_PIN, CARRIER_FREQ, DUTY_CYCLE);
+                pigpio_stop(pi);
+                RCLCPP_INFO(this->get_logger(), "Segnale IR trasmesso!");
             }
-
-            ws->send("Hello!");
-            ws->poll();
-            RCLCPP_INFO(this->get_logger(), "Connected to ESP32 at %s:%ld", 
-                        ip.c_str(), port);
         } else {
-            clock_ = std::make_shared<rclcpp::Clock>(RCL_ROS_TIME);
-
-            RCLCPP_INFO(this->get_logger(), "Running in simulation mode");
-            pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>(
-                "/diff_cont/cmd_vel", 
-                rclcpp::QoS(rclcpp::KeepLast(10)).reliable());
-            RCLCPP_INFO(this->get_logger(), "Publisher on /diff_cont/cmd_vel created");
+            RCLCPP_WARN(this->get_logger(), "Segnale IR vuoto, niente da trasmettere");
         }
-
 
         subscription_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
         "/cmd_vel_nav", rclcpp::QoS(10).reliable(),
@@ -115,19 +102,9 @@ public:
 
     void send_command()
     {
-        if (!this->simulation_) {
-            if (ws) {
-                ws->send(state_to_string(current_state));
-                ws->poll();
-            }
-        } else {
-            auto it = command_map.find(this->current_state);
-            auto msg = geometry_msgs::msg::TwistStamped();
-            msg.header.stamp = this->now(); 
-            msg.header.frame_id = "base_link";
-            msg.twist.linear.x  = it->second.first;
-            msg.twist.angular.z = it->second.second;
-            pub_->publish(msg);
+        if (ws) {
+            ws->send(state_to_string(current_state));
+            ws->poll();
         }
     }
 
@@ -140,6 +117,61 @@ public:
             RCLCPP_WARN(this->get_logger(), "Watchdog triggered: stopping robot");
         }
     }
+
+    std::vector<IRSignal> read_ir_from_file(const std::string& filename) {
+        std::vector<IRSignal> signal;
+        std::ifstream infile(filename);
+        if (!infile.is_open()) {
+            std::cerr << "Errore: impossibile aprire file IR: " << filename << std::endl;
+            return signal;
+        }
+
+        std::string type;
+        int duration;
+        while (infile >> type >> duration) {
+            signal.push_back({type, duration});
+        }
+        return signal;
+    }
+
+
+    // --- FUNZIONE PER TRASMETTERE ---
+    void send_raw_wave(int pi, const std::vector<IRSignal>& signal,
+                    int gpio_pin, int carrier_freq, double duty_cycle) {
+        int micros_per_cycle = static_cast<int>(1'000'000 / carrier_freq);
+        int on_micros = static_cast<int>(micros_per_cycle * duty_cycle);
+        int off_micros = micros_per_cycle - on_micros;
+
+        std::vector<gpioPulse_t> wf;
+
+        for (const auto& s : signal) {
+            if (s.type == "pulse") {
+                int cycles = s.duration / micros_per_cycle;
+                for (int i = 0; i < cycles; i++) {
+                    gpioPulse_t p1 = {1u << gpio_pin, 0, static_cast<uint32_t>(on_micros)};
+                    gpioPulse_t p2 = {0, 1u << gpio_pin, static_cast<uint32_t>(off_micros)};
+                    wf.push_back(p1);
+                    wf.push_back(p2);
+                }
+            } else if (s.type == "space") {
+                gpioPulse_t space = {0, 0, static_cast<uint32_t>(s.duration)};
+                wf.push_back(space);
+            }
+        }
+
+        wave_clear(pi);
+        wave_add_generic(pi, wf.size(), wf.data());
+        int wave_id = wave_create(pi);
+
+        if (wave_id >= 0) {
+            wave_send_once(pi, wave_id);
+            while (wave_tx_busy(pi)) {
+                time_sleep(0.001); // attesa fine trasmissione
+            }
+            wave_delete(pi, wave_id);
+        }
+    }
+
 
     std::string state_to_string(RobotState state) {
         switch (state) {
@@ -166,10 +198,12 @@ public:
     rclcpp::TimerBase::SharedPtr publish_timer_;
     
     rclcpp::Clock::SharedPtr clock_;
-    bool simulation_;
     RobotState current_state;
     rclcpp::TimerBase::SharedPtr watchdog_timer_;
     rclcpp::Time last_cmd_time_;
+
+    std::string signals_dir_path_;
+    std::map<RobotState, std::vector<IRSignal>> ir_signals;
 };
   
 int main(int argc, char * argv[])

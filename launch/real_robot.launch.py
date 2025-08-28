@@ -26,6 +26,11 @@ def generate_launch_description():
         'config',
         'twist_mux.yaml'
     )
+    signals_dir = os.path.join(
+        get_package_share_directory(package_name),
+        'config',
+        'signals'
+    )
 
 
     # Start robot state publisher
@@ -47,7 +52,7 @@ def generate_launch_description():
     step_controller_node = Node(
         package=package_name,
         executable='step_controller_node',
-        parameters=[{'simulation': True}, {'use_sim_time': False}],
+        parameters=[{'simulation': False}, {'use_sim_time': False}, {'signals_dir': signals_dir}],
         output='screen'
     )
 
