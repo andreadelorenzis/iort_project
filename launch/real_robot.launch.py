@@ -21,6 +21,13 @@ def generate_launch_description():
         'signals'
     )
 
+    # Lifecycle manager configuration file
+    lc_mgr_config_path = os.path.join(
+        get_package_share_directory(package_name),
+        'config',
+        'lifecycle_mgr_slam.yaml'
+    )
+
     # Start robot state publisher
     rsp = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
@@ -28,6 +35,37 @@ def generate_launch_description():
         )])
     )
 
+    # Lifecycle manager node
+    lc_mgr_node = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager',
+        output='screen',
+        parameters=[
+            # YAML files
+            lc_mgr_config_path  # Parameters
+        ]
+    )
+
+    # Include LDLidar launch    
+    ldlidar_launch = IncludeLaunchDescription(
+        launch_description_source=PythonLaunchDescriptionSource([
+            get_package_share_directory(package_name),
+            '/launch/ldlidar_bringup.launch.py'
+        ]),
+        launch_arguments={
+            'node_name': 'ldlidar_node'
+        }.items()
+    )
+
+    # Fake odom publisher
+    fake_odom = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='static_transform_publisher',
+        output='screen',
+        arguments=['0', '0', '0', '0', '0', '0', 'odom', 'base_link']
+    )
 
     # Start step controller
     step_controller_node = Node(
@@ -37,16 +75,12 @@ def generate_launch_description():
         output='screen'
     )
 
-    ldlidar_slam = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory(package_name), 
-                         'launch', 
-                         'ldlidar_slam.launch.py'))
-        )
 
     # Launch them all!
     return LaunchDescription([
         rsp,
-        step_controller_node,
-        ldlidar_slam,
+        lc_mgr_node,
+        fake_odom,
+        ldlidar_launch,
+        step_controller_node
     ])
