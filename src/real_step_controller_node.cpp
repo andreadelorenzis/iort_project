@@ -52,20 +52,16 @@ public:
         signals_dir_path_ = this->get_parameter("signals_dir").as_string();
         RCLCPP_INFO(this->get_logger(), "Signals dir path: %s", signals_dir_path_.c_str());
 
-        ir_signals[RobotState::FORWARD]  = read_ir_from_file(signals_dir_path + "/ir_forward.txt");
-        ir_signals[RobotState::BACKWARD] = read_ir_from_file(signals_dir_path + "/ir_backward.txt");
-        ir_signals[RobotState::LEFT]     = read_ir_from_file(signals_dir_path + "/ir_left.txt");
-        ir_signals[RobotState::RIGHT]    = read_ir_from_file(signals_dir_path + "/ir_right.txt");
+        ir_signals[RobotState::FORWARD]  = read_ir_from_file(signals_dir_path_ + "/ir_forward.txt");
+        ir_signals[RobotState::BACKWARD] = read_ir_from_file(signals_dir_path_ + "/ir_backward.txt");
+        ir_signals[RobotState::LEFT]     = read_ir_from_file(signals_dir_path_ + "/ir_left.txt");
+        ir_signals[RobotState::RIGHT]    = read_ir_from_file(signals_dir_path_ + "/ir_right.txt");
 
         pi = pigpio_start(NULL, NULL);
         if (pi < 0) {
             RCLCPP_ERROR(this->get_logger(), "Error during connection to pigpiod");
         } else {
             RCLCPP_INFO(this->get_logger(), "Connected to pigpio deamon!");
-        }
-        if (!raw_signal.empty()) {
-        } else {
-            RCLCPP_WARN(this->get_logger(), "Segnale IR vuoto, niente da trasmettere");
         }
 
         subscription_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
