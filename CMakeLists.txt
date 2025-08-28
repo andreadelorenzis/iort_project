@@ -98,7 +98,6 @@ if(BUILD_FOR_ROBOT)
   ament_target_dependencies(real_step_controller_node
     rclcpp
     geometry_msgs
-    pluginlib
   )
 
 endif()
