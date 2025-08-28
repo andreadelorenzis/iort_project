@@ -27,6 +27,12 @@ struct IRSignal {
     int duration;     // microsecondi
 };
 
+const int IR_RX_PIN = 27;   // GPIO ricevitore IR
+const int IR_TX_PIN = 22;   // GPIO LED IR
+const int CARRIER_FREQ = 38000; // Hz (38 kHz standard)
+const double DUTY_CYCLE = 0.33; // 33%
+const int DELAY_BEFORE_SEND = 5; // secondi
+
 enum class RobotState {
     STOP,
     FORWARD,
@@ -34,6 +40,7 @@ enum class RobotState {
     LEFT,
     RIGHT
 };
+using std::placeholders::_1;
 
 class StepController : public rclcpp::Node
 {
