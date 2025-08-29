@@ -25,7 +25,7 @@ def generate_launch_description():
     lc_mgr_config_path = os.path.join(
         get_package_share_directory(package_name),
         'config',
-        'lifecycle_mgr_slam.yaml'
+        'lifecycle_mgr.yaml'
     )
 
     # Start robot state publisher
