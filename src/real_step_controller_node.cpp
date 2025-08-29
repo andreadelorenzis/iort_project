@@ -18,6 +18,7 @@
 #include <vector>
 #include <fstream>
 #include <map>
+#include "std_msgs/msg/string.hpp"
 #ifdef BUILD_FOR_ROBOT
 #include <pigpiod_if2.h>
 #endif
@@ -66,8 +67,12 @@ public:
 
         subscription_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
         "/cmd_vel_nav", rclcpp::QoS(10).reliable(),
-        std::bind(&StepController::cmd_callback, this, _1));
+        std::bind(&StepController::nav_cmd_callback, this, _1));
         RCLCPP_INFO(this->get_logger(), "Subscription on /cmd_vel created!");
+
+        manual_cmd_sub_ = this->create_subscription<std_msgs::msg::String>(
+        "/manual_cmd", 10, std::bind(&StepController::manual_cmd_callback, this, _1));
+        RCLCPP_INFO(this->get_logger(), "Subscription on /manual_cmd created!");
 
         publish_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(100),
@@ -87,7 +92,7 @@ public:
 
     private:
 
-    void cmd_callback(const geometry_msgs::msg::TwistStamped::SharedPtr msg)
+    void nav_cmd_callback(const geometry_msgs::msg::TwistStamped::SharedPtr msg)
     {
         last_cmd_time_ = now();
         const double EPS = 1e-3;
@@ -105,6 +110,28 @@ public:
         if (new_state != current_state) {
             current_state = new_state;
             RCLCPP_INFO(this->get_logger(), "Current state: %s", state_to_string(current_state).c_str());
+        }
+    }
+
+    void manual_cmd_callback(const std_msgs::msg::String msg)
+    {
+        std::string cmd = msg.data;
+        switch(cmd)
+        {
+        case "LEFT":
+            current_state = RobotState::LEFT;
+            break;
+        case "RIGHT":
+            current_state = RobotState::RIGHT;
+            break;
+        case "FORWARD":
+            current_state = RobotState::FORWARD;
+            break;
+        case "STOP":
+            current_state = RobotState::STOP;
+            break;
+        default:
+            break;
         }
     }
 
@@ -215,7 +242,7 @@ public:
     };
 
     rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr subscription_;
-    rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr manual_cmd_sub_;
     rclcpp::TimerBase::SharedPtr publish_timer_;
     
     rclcpp::Clock::SharedPtr clock_;

@@ -8,10 +8,9 @@ from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
-from launch_ros.actions import Node
 from launch.actions import RegisterEventHandler, TimerAction
 from launch.event_handlers import OnProcessExit, OnProcessStart
-
+from launch_ros.actions import Node, LifecycleNode
 
 def generate_launch_description():
     package_name='vacuum_bot'
@@ -29,7 +28,13 @@ def generate_launch_description():
     rviz_config = os.path.join(
         get_package_share_directory(package_name),
         'config',
-        'main.rviz',
+        'final.rviz',
+    )
+    # SLAM Toolbox configuration for LDLidar
+    slam_config_path = os.path.join(
+        get_package_share_directory(package_name),
+        'config',
+        'slam_toolbox.yaml'
     )
 
     # Start multiplexer
@@ -40,12 +45,27 @@ def generate_launch_description():
             remappings=[('/cmd_vel_out','/diff_cont/cmd_vel')]
         )
 
-    ldlidar_slam = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(get_package_share_directory(package_name), 
-                         'launch', 
-                         'ldlidar_slam.launch.py'))
-        )
+    slam_toolbox_node = LifecycleNode(
+        package='slam_toolbox',
+        executable='async_slam_toolbox_node',
+        namespace='',
+        name='slam_toolbox',
+        output='screen',
+        parameters=[slam_config_path],
+        remappings=[('/scan', '/ldlidar_node/scan')]
+    )
+
+    lc_mgr_node = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_slam',
+        output='screen',
+        parameters=[{
+            'use_sim_time': False,
+            'autostart': True,
+            'node_names': ['slam_toolbox']
+        }]
+    )
 
     # start nav2/OpenNAV
     bringup_cmd = IncludeLaunchDescription(
@@ -70,16 +90,22 @@ def generate_launch_description():
         launch_arguments={
             'namespace': '', 
             'rviz_config': rviz_config,
-            'use_sim_time': 'true'
+            'use_sim_time': 'false'
         }.items())
+    
+    web_bridge_node = Node(
+        package=package_name,
+        executable='web_bridge_node',
+        output='screen'
+    )
 
     # Launch them all!
     return LaunchDescription([
-        # rsp,
+        lc_mgr_node,
+        slam_toolbox_node,
         twist_mux,
-        # step_controller_node,
-        # ldlidar_slam,
         bringup_cmd,
         coverage_node,
+        web_bridge_node,
         rviz_cmd
     ])
