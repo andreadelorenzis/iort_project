@@ -8,6 +8,7 @@
 #include <geometry_msgs/msg/point32.hpp>
 #include "easywsclient.hpp"
 #include "nlohmann/json.hpp"
+#include "std_msgs/msg/string.hpp"
 
 using json = nlohmann::json;
 using std::placeholders::_1;
@@ -29,11 +30,14 @@ public:
 
         std::stringstream url;
         url << "ws://" << ip << ":" << port;
-        ws = WebSocket::from_url(url.str());
-        if (!ws) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to connect to web socket server at %s:%ld",
-                        ip.c_str(), port);
-            throw std::runtime_error("Web socket connection failed");
+
+        while(!rclcpp::ok() || !ws) {
+            ws = WebSocket::from_url(url.str());
+            if (!ws) {
+                RCLCPP_WARN(this->get_logger(), "Failed to connect to web socket server at %s:%ld, retrying...",
+                            ip.c_str(), port);
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
         }
 
         ws->send("Hello!");
@@ -51,6 +55,10 @@ public:
             10);
         RCLCPP_INFO(this->get_logger(), "Publisher on /coverage_start created");
 
+        manual_pub_ = this->create_publisher<std_msgs::msg::String>(
+            "/manual_cmd", 
+            10);
+        RCLCPP_INFO(this->get_logger(), "Publisher on /manual_cmd created");
 
         // Timer to poll websocket every 50ms
         timer_ = this->create_wall_timer(
@@ -99,7 +107,7 @@ private:
                     }
                 }
 
-                // Nuovo tipo: coverage
+                // coverage
                 else if (j.contains("type") && j["type"] == "coverage" && j.contains("points")) {
                     geometry_msgs::msg::Polygon poly;
                     for (auto &pt : j["points"]) {
@@ -114,6 +122,16 @@ private:
                         RCLCPP_INFO(this->get_logger(), "Published coverage polygon with %zu points", poly.points.size());
                     }
                 }
+
+                // manual
+                else if (j.contains("type") && j["type"] == "manual" && j.contains("command")) {
+                    std::string command = j["command"].get<std::string>();
+                    std_msgs::msg::String msg;
+                    msg.data = command;
+                    manual_pub_->publish(msg);
+                    RCLCPP_INFO(this->get_logger(), "Published command: %s", command.c_str());
+                }
+
             } catch (const std::exception &e) {
                 RCLCPP_ERROR(this->get_logger(), "Failed to parse JSON: %s", e.what());
             }
@@ -122,6 +140,7 @@ private:
 
     rclcpp::Publisher<geometry_msgs::msg::Polygon>::SharedPtr pub_;
     rclcpp::Publisher<geometry_msgs::msg::Polygon>::SharedPtr coverage_pub_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr manual_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
     int sock_{-1};
 };
