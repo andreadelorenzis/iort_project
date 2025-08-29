@@ -106,6 +106,6 @@ def generate_launch_description():
         twist_mux,
         bringup_cmd,
         coverage_node,
-        web_bridge_node,
+        # web_bridge_node,
         rviz_cmd
     ])
