@@ -19,9 +19,7 @@
 #include <fstream>
 #include <map>
 #include "std_msgs/msg/string.hpp"
-#ifdef BUILD_FOR_ROBOT
 #include <pigpiod_if2.h>
-#endif
 
 struct IRSignal {
     std::string type; // "pulse" o "space"
@@ -113,27 +111,15 @@ public:
         }
     }
 
-    void manual_cmd_callback(const std_msgs::msg::String msg)
+    void manual_cmd_callback(const std_msgs::msg::String::SharedPtr msg)
     {
-        std::string cmd = msg.data;
-        switch(cmd)
-        {
-        case "LEFT":
-            current_state = RobotState::LEFT;
-            break;
-        case "RIGHT":
-            current_state = RobotState::RIGHT;
-            break;
-        case "FORWARD":
-            current_state = RobotState::FORWARD;
-            break;
-        case "STOP":
-            current_state = RobotState::STOP;
-            break;
-        default:
-            break;
-        }
+        std::string cmd = msg->data;
+        if (cmd == "LEFT")       current_state = RobotState::LEFT;
+        else if (cmd == "RIGHT") current_state = RobotState::RIGHT;
+        else if (cmd == "FORWARD") current_state = RobotState::FORWARD;
+        else if (cmd == "STOP")  current_state = RobotState::STOP;
     }
+
 
     void send_command()
     {
