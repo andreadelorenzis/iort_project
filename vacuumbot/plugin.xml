@@ -1,0 +1,7 @@
+<library path="coverage_planner">
+  <class name="coverage_planner::CoveragePlanner"
+         type="coverage_planner::CoveragePlanner"
+         base_class_type="nav2_core::GlobalPlanner">
+    <description>Coverage path planner using Fields2Cover</description>
+  </class>
+</library>
