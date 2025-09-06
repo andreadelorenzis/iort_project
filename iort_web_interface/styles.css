@@ -1,0 +1,865 @@
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      color: #333;
+    }
+
+    /* Navigation */
+    .nav-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .nav {
+      display: flex;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .nav-btn {
+      padding: 12px 24px;
+      margin: 0 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .nav-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .nav-btn.active {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    }
+
+    /* Pages */
+    .page {
+      display: none;
+      min-height: 100vh;
+      padding-top: 80px;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    /* Map Page */
+    #map-page {
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: calc(100vh - 80px);
+    }
+
+    .map-controls {
+      position: absolute;
+      top: 100px;
+      right: 20px;
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .map-btn {
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.95);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      color: #333;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(10px);
+      min-width: 140px;
+    }
+
+    .map-btn:hover {
+      background: white;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .map-btn.primary {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+      color: white;
+    }
+
+    .map-btn.primary:hover {
+      background: linear-gradient(135deg, #ee5a24 0%, #ff6b6b 100%);
+    }
+
+    .map-info {
+      position: absolute;
+      top: 100px;
+      left: 20px;
+      z-index: 1001;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 16px;
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      max-width: 300px;
+    }
+
+    .map-info h3 {
+      margin-bottom: 8px;
+      color: #333;
+      font-size: 14px;
+    }
+
+    /* Video Panel */
+    .video-panel {
+      position: absolute;
+      top: 100px;
+      left: 20px;
+      z-index: 1002;
+      background: rgba(0, 0, 0, 0.9);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s ease;
+      overflow: hidden;
+    }
+
+    .video-panel.collapsed {
+      width: 60px;
+      height: 60px;
+    }
+
+    .video-panel.expanded {
+      width: 320px;
+      height: 240px;
+    }
+
+    .video-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .video-header:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .video-title {
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .video-title .icon {
+      font-size: 16px;
+    }
+
+    .collapse-btn {
+      background: none;
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.2s ease;
+      padding: 4px;
+      border-radius: 4px;
+    }
+
+    .collapse-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .video-content {
+      padding: 0;
+      height: calc(100% - 48px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-stream {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 0 0 12px 12px;
+    }
+
+    .video-placeholder {
+      color: rgba(255, 255, 255, 0.7);
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
+    }
+
+    .video-status {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff6b6b;
+      transition: all 0.3s ease;
+    }
+
+    .video-status.connected {
+      background: #51cf66;
+    }
+
+    /* Collapsed state styles */
+    .video-panel.collapsed .video-title span {
+      display: none;
+    }
+
+    .video-panel.collapsed .collapse-btn {
+      display: none;
+    }
+
+    .video-panel.collapsed .video-content {
+      display: none;
+    }
+
+    .video-panel.collapsed .video-header {
+      padding: 18px;
+      justify-content: center;
+    }
+
+    /* Manual Control Page */
+    #manual-page {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      min-height: calc(100vh - 80px);
+      padding: 20px;
+    }
+
+    #manual-page.active {
+        display: flex;
+    }
+
+    .gamepad-container {
+      background: rgba(255, 255, 255, 0.95);
+      padding: 40px;
+      border-radius: 50%;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(10px);
+      position: relative;
+      width: min(400px, 80vw);
+      height: min(400px, 80vw);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gamepad {
+      position: relative;
+      width: 280px;
+      height: 280px;
+    }
+
+    .direction-btn {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 24px;
+      font-weight: bold;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      color: white;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .direction-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .direction-btn:active {
+      transform: scale(0.95);
+    }
+
+    .direction-btn.up {
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .direction-btn.down {
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .direction-btn.left {
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .direction-btn.right {
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .center-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100px;
+      height: 100px;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+      color: white;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .center-btn:hover {
+      transform: translate(-50%, -50%) scale(1.1);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .center-btn:active {
+      transform: translate(-50%, -50%) scale(0.95);
+    }
+
+    /* Status indicator */
+    .status-indicator {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 25px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      z-index: 1001;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ff6b6b;
+      transition: all 0.3s ease;
+    }
+
+    .status-dot.connected {
+      background: #51cf66;
+    }
+
+    /* Sfondo modale */
+    .modal {
+      display: none; /* nascosta di default */
+      position: fixed;
+      z-index: 999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Contenitore */
+    .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      width: 300px;
+      text-align: center;
+      box-shadow: 0px 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .modal-content h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+    }
+
+    .modal-content input {
+      width: 100%;
+      padding: 8px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .modal-actions button {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .modal-actions button:first-child {
+      background-color: #2ecc71;
+      color: white;
+    }
+
+    .modal-actions button:last-child {
+      background-color: #e74c3c;
+      color: white;
+    }
+
+    .color-swatch {
+      width: 30px;
+      height: 30px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.1s, border 0.1s;
+    }
+
+    .color-swatch.selected {
+      border: 2px solid #000;
+      transform: scale(1.1);
+    }
+
+
+    /* === RULES PAGE === */
+    #rules-page {
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      margin-top: 80px;
+    }
+
+    #rules-page h2 {
+      margin-bottom: 16px;
+    }
+
+    #rules-list {
+      margin-bottom: 20px;
+    }
+
+    .rule-buttons {
+      display: flex;
+    }
+
+    .rule-buttons button {
+      margin-right: 20px;
+    }
+
+    .rule-item {
+      background: #f4f4f9;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .rule-item b {
+      color: #2c3e50;
+    }
+
+    .rule-item button {
+      margin-left: 8px;
+      background: #3498db;
+      color: #fff;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .rule-item button:hover {
+      background: #2980b9;
+    }
+
+    .rule-btn {
+      padding: 12px 20px;
+      background: rgba(255, 255, 255, 0.95);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      color: #333;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(10px);
+      min-width: 140px;
+    }
+
+    .rule-btn:hover {
+      background: white;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .rule-btn.primary {
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+      color: white;
+    }
+
+    .rule-btn.primary:hover {
+      background: linear-gradient(135deg, #ee5a24 0%, #ff6b6b 100%);
+    }
+
+    /* === MODAL PER LE REGOLE === */
+    #ruleModal {
+      display: none; 
+      position: fixed; 
+      z-index: 2000; 
+      left: 0;
+      top: 0;
+      width: 100%; 
+      height: 100%; 
+      background-color: rgba(0,0,0,0.5); 
+      justify-content: center;
+      align-items: center;
+    }
+
+    #ruleModal .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      width: 400px;
+      max-width: 90%;
+    }
+
+    #ruleModal h3 {
+      margin-top: 0;
+    }
+
+    #ruleModal label {
+      display: block;
+      margin-top: 12px;
+      font-weight: bold;
+    }
+
+    #ruleModal select,
+    #ruleModal input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 6px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    #ruleModal .modal-actions {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    #ruleModal .modal-actions button {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #ruleModal .modal-actions button:first-child {
+      background: #27ae60;
+      color: white;
+    }
+
+    #ruleModal .modal-actions button:first-child:hover {
+      background: #1e8449;
+    }
+
+    #ruleModal .modal-actions button:last-child {
+      background: #e74c3c;
+      color: white;
+    }
+
+    #ruleModal .modal-actions button:last-child:hover {
+      background: #c0392b;
+    }
+
+    /* === RULES TABLE === */
+    #rules-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+
+    #rules-table th,
+    #rules-table td {
+      background: #f1f1f1;
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+
+    #rules-table th {
+      background: #3498db;
+      color: white;
+    }
+
+    #rules-table tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    /* #rules-table tr:hover {
+      background: #f1f1f1;
+    } */
+
+    /* Bottoni azione */
+    #rules-table button {
+      border: none;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 2px;
+      color: white;
+    }
+
+    #rules-table .edit-btn {
+      background: #27ae60;
+    }
+
+    #rules-table .edit-btn:hover {
+      background: #1e8449;
+    }
+
+    #rules-table .delete-btn {
+      background: #e74c3c;
+    }
+
+    #rules-table .delete-btn:hover {
+      background: #c0392b;
+    }
+
+/* === ACTIONS MODAL === */
+.modal {
+  display: none; /* nascosto di default */
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background-color: #fff;
+  margin: auto;
+  padding: 20px 30px;
+  border-radius: 10px;
+  width: 320px;
+  max-width: 90%;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.2em;
+  text-align: center;
+  color: #333;
+}
+
+.modal input[type="text"],
+.modal input[type="number"],
+.modal select {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95em;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-actions button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: background-color 0.2s;
+}
+
+.modal-actions button:hover {
+  opacity: 0.9;
+}
+
+.modal-actions button:first-child {
+  background-color: #2ecc71;
+  color: #fff;
+}
+
+.modal-actions button:last-child {
+  background-color: #c0392b;
+}
+
+/* ---------- COLOR SWATCH ---------- */
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.color-swatch.selected {
+  border: 2px solid #333;
+}
+
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+      .nav {
+        flex-wrap: wrap;
+        padding: 0.5rem;
+      }
+
+      .nav-btn {
+        padding: 8px 16px;
+        margin: 4px;
+        font-size: 14px;
+      }
+
+      .map-controls {
+        top: 90px;
+        right: 10px;
+      }
+
+      .map-btn {
+        padding: 8px 12px;
+        min-width: 100px;
+        font-size: 14px;
+      }
+
+      .map-info {
+        top: 90px;
+        left: 10px;
+        padding: 12px;
+        max-width: 250px;
+      }
+
+      .video-panel {
+        position: inherit;
+        top: 90px;
+        left: 10px;
+      }
+
+      .video-panel.expanded {
+        width: 280px;
+        height: 210px;
+      }
+
+      .gamepad-container {
+        padding: 20px;
+      }
+
+      .gamepad {
+        width: 240px;
+        height: 240px;
+      }
+
+      .direction-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 20px;
+      }
+
+      .center-btn {
+        width: 80px;
+        height: 80px;
+        font-size: 14px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .page {
+        padding-top: 120px;
+      }
+
+      #map {
+        height: calc(100vh - 120px);
+      }
+
+      .video-panel {
+        position: inherit;
+        top: 130px;
+        left: 10px;
+      }
+
+      .video-panel.expanded {
+        width: calc(100vw - 40px);
+        height: 180px;
+      }
+
+      .gamepad {
+        width: 200px;
+        height: 200px;
+      }
+
+      .direction-btn {
+        width: 50px;
+        height: 50px;
+        font-size: 18px;
+      }
+
+      .center-btn {
+        width: 70px;
+        height: 70px;
+        font-size: 12px;
+      }
+      
+    }
