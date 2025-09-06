@@ -111,7 +111,7 @@ public:
         }
     }
 
-    void manual_cmd_callback(const std_msgs::msg::String msg)
+    void manual_cmd_callback(const std_msgs::msg::String::SharedPtr msg)
     {
         std::string cmd = msg->data;
         if (cmd == "LEFT")       current_state = RobotState::LEFT;
