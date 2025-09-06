@@ -95,7 +95,7 @@ def generate_launch_description():
     # Start step controller
     step_controller_node = Node(
         package=package_name,
-        executable='step_controller_node',
+        executable='sim_step_controller_node',
         parameters=[{'simulation': True}, {'use_sim_time': True}],
         output='screen'
     )

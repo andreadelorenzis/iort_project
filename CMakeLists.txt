@@ -31,6 +31,13 @@ if(NOT BUILD_FOR_ROBOT)
 endif()
 find_package(lifecycle_msgs REQUIRED)
 
+# find_package(PkgConfig REQUIRED)
+# pkg_check_modules(PAHO_MQTT_CPP REQUIRED paho-mqttpp3)
+# pkg_check_modules(PAHO_MQTT_C REQUIRED paho-mqtt3as)
+
+include_directories(/usr/include)
+link_directories(/usr/lib/x86_64-linux-gnu)
+
 include_directories(
   include 
   /usr/local/include
@@ -50,6 +57,10 @@ if(NOT BUILD_FOR_ROBOT)
       src/coverage_nav2_node.cpp
   )
 endif()
+
+add_executable(mqtt_ros2_bridge
+    src/mqtt_ros2_bridge.cpp
+)
 
 if(BUILD_FOR_ROBOT)
   add_executable(real_step_controller_node
@@ -93,6 +104,16 @@ if(NOT BUILD_FOR_ROBOT)
   )
 endif()
 
+ament_target_dependencies(mqtt_ros2_bridge
+  rclcpp
+  std_msgs
+  geometry_msgs
+)
+target_link_libraries(mqtt_ros2_bridge
+  paho-mqttpp3
+  paho-mqtt3as
+)
+
 if(BUILD_FOR_ROBOT)
 
   ament_target_dependencies(real_step_controller_node
@@ -114,7 +135,7 @@ if(NOT BUILD_FOR_ROBOT)
     sim_step_controller_node
     web_bridge_node
     coverage_nav2_node
-    # coverage_planner
+    mqtt_ros2_bridge
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -128,6 +149,7 @@ endif()
 if(BUILD_FOR_ROBOT)
   install(TARGETS
     real_step_controller_node
+    mqtt_ros2_bridge
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION lib/${PROJECT_NAME}

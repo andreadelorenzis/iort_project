@@ -560,7 +560,6 @@
         <pose >-3.146710 2.476204 0.000704 0 -0 -1.569673</pose>
 	</model>
 
-<!--   
   <model name='RoomWindow_01_001'>
         <static>true</static>    
         <include>
@@ -623,7 +622,7 @@
             <uri>model://aws_robomaker_residential_RoomWindow_01</uri>
         </include>
         <pose >-2.396624 4.387607 0.502739 0 -0 0</pose>
-	</model> -->
+	</model>
 
 
     <light name='LivingRoom_CeilingLight_0' type='point'>
