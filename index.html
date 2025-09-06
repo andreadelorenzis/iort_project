@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ROS2 Control Interface</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <div class="nav-container">
+    <nav class="nav">
+      <button class="nav-btn active" onclick="showPage('map')">Controllo Mappa</button>
+      <button class="nav-btn" onclick="showPage('manual')">Controllo Manuale</button>
+      <button class="nav-btn" onclick="showPage('rules')">Gestione Regole</button>
+    </nav>
+  </div>
+
+  <!-- Rules Page -->
+  <div id="rules-page" class="page">
+    <div class="rule-buttons">
+      <button class="rule-btn" onclick="openRuleForm()">➕ Aggiungi regola</button>
+      <button class="rule-btn" onclick="openSensorForm()">➕ Aggiungi sensore</button>
+      <button class="rule-btn" onclick="openRobotForm()">➕ Aggiungi robot</button>
+    </div>
+
+    <!-- Lista regole -->
+    <table id="rules-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Sensor</th>
+          <th>Robot</th>
+          <th>Zone</th>
+          <th>Operation</th>
+          <th>Condition</th>
+          <th>Interval</th>
+          <th>Value</th>
+          <th>Action</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="rules-list">
+        <!-- le regole vengono renderizzate via JS -->
+      </tbody>
+    </table>
+
+    
+    <!-- Modal Form -->
+    <div id="ruleModal" class="modal">
+      <div class="modal-content">
+        <h3>Nuova/Modifica Regola</h3>
+
+        <label>Name</label>
+        <input type="text" id="rule-name" />
+        
+        <label>Sensor</label>
+        <select id="rule-sensor"></select>
+        
+        <label>Robot</label>
+        <select id="rule-robot">
+          <option value="robot1">robot1</option>
+        </select>
+        
+        <label>Zone</label>
+        <select id="rule-zone"></select>
+        
+        <label>Operation</label>
+        <select id="rule-operation"></select>
+        
+        <label>Condition</label>
+        <select id="rule-condition"></select>
+
+        <label>Interval</label>
+        <input type="text" id="rule-interval" />
+        
+        <label>Value</label>
+        <input type="number" id="rule-value" />
+        
+        <label>Action</label>
+        <select id="rule-action"></select>
+
+        <div class="modal-actions">
+          <button onclick="saveRule()">Salva</button>
+          <button onclick="closeRuleModal()">Annulla</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="sensorModal" class="modal">
+    <div class="modal-content">
+      <h3>Nuovo Sensore</h3>
+      <input type="text" id="sensorNameInput" placeholder="Inserisci il nome del sensore" />
+
+      <div class="modal-actions">
+        <button onclick="confirmSensor()">Conferma</button>
+        <button onclick="closeSensorModal()">Annulla</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="robotModal" class="modal">
+    <div class="modal-content">
+      <h3>Nuovo Robot</h3>
+      <input type="text" id="robotNameInput" placeholder="Inserisci il nome del robot" />
+
+      <div class="modal-actions">
+        <button onclick="confirmRobot()">Conferma</button>
+        <button onclick="closeRobotModal()">Annulla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map Page -->
+  <div id="map-page" class="page active">
+    <div id="map"></div>
+    
+    <!-- <div class="map-info" id="map-info">
+      <h3>📍 Istruzioni</h3>
+      <p>Clicca sulla mappa per disegnare una zona di copertura. Servono almeno 3 punti per creare un poligono.</p>
+    </div> -->
+    
+    <div class="map-controls" id="map-controls">
+      <button class="map-btn primary" onclick="sendPolygon()">🚀 Invia Missione</button>
+      <button class="map-btn" onclick="clearMap()">🗑️ Pulisci Mappa</button>
+      <button class="map-btn" onclick="undoLastPoint()">↶ Annulla Punto</button>
+      <button class="map-btn" onclick="createVirtualZone()">Crea stanza virtuale</button>
+      <button class="map-btn" id="edit-zone" onclick="editVirtualZone()" style="display: none;">Modifica stanza virtuale</button>
+      <button class="map-btn" id="delete-zone" onclick="editVirtualZone()" style="display: none;">Elimina stanza virtuale</button>
+    </div>
+  </div>
+
+  <!-- Manual Control Page -->
+  <div id="manual-page" class="page">
+    
+    <!-- Video Panel -->
+    <div class="video-panel collapsed" id="video-panel">
+      <div class="video-header" onclick="toggleVideoPanel()">
+        <div class="video-title">
+          <span class="icon">📹</span>
+          <span>Camera Robot</span>
+        </div>
+        <button class="collapse-btn" onclick="event.stopPropagation(); toggleVideoPanel()">
+          <span id="collapse-icon">▼</span>
+        </button>
+        <div class="video-status" id="video-status"></div>
+      </div>
+      <div class="video-content">
+        <!-- <video class="video-stream" id="video-stream" autoplay muted playsinline style="display: none;">
+          Il tuo browser non supporta il tag video.
+        </video> -->
+        <img class="video-stream" id="video-stream" crossorigin="">
+        <div class="video-placeholder" id="video-placeholder">
+          <div>📹</div>
+          <div style="margin-top: 8px;">Camera non connessa</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gamepad-container">
+      <div class="gamepad">
+        <button class="direction-btn up" onclick="sendManualCmd('FORWARD')">↑</button>
+        <button class="direction-btn left" onclick="sendManualCmd('LEFT')">←</button>
+        <button class="direction-btn right" onclick="sendManualCmd('RIGHT')">→</button>
+        <button class="direction-btn down" onclick="sendManualCmd('BACKWARD')">↓</button>
+        <button class="center-btn" onclick="sendManualCmd('STOP')">STOP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Indicator -->
+  <div class="status-indicator">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Disconnesso</span>
+  </div>
+
+  <!-- Modal per inserire nome stanza -->
+  <div id="zoneModal" class="modal">
+    <div class="modal-content">
+      <h3>Nome della stanza</h3>
+      <input type="text" id="zoneNameInput" placeholder="Inserisci il nome" />
+
+      <h3>Colore della stanza</h3>
+      <div id="colorPalette" style="display: flex; gap: 8px; margin-bottom: 16px;">
+        <div class="color-swatch" data-color="#2ecc71" style="background:#2ecc71;"></div>
+        <div class="color-swatch" data-color="#3498db" style="background:#3498db;"></div>
+        <div class="color-swatch" data-color="#e74c3c" style="background:#e74c3c;"></div>
+        <div class="color-swatch" data-color="#f1c40f" style="background:#f1c40f;"></div>
+        <div class="color-swatch" data-color="#9b59b6" style="background:#9b59b6;"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button onclick="confirmVirtualZone()">Conferma</button>
+        <button onclick="closeZoneModal()">Annulla</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="scripts/main.js"></script>
+</body>
+</html>
