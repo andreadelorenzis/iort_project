@@ -4,6 +4,9 @@
 #include "nlohmann/json.hpp"
 #include <geometry_msgs/msg/polygon.hpp>
 #include <geometry_msgs/msg/point32.hpp>
+#include "vacuum_bot/msg/coverage_zone.hpp"
+#include "vacuum_bot/msg/coverage_plan.hpp"
+#include "vacuum_bot/msg/coverage_mission.hpp"
 
 using json = nlohmann::json;
 
@@ -50,6 +53,14 @@ public:
             10);
         RCLCPP_INFO(this->get_logger(), "Publisher on /manual_cmd created");
 
+        mission_pub_ = this->create_publisher<vacuum_bot::msg::CoverageMission>(
+            "/cleaning_mission", 
+            10);
+        RCLCPP_INFO(this->get_logger(), "Publisher on /cleaning_mission created");
+
+        debug_pub_ = this->create_publisher<std_msgs::msg::String>("/debug", 10);
+        publishDebug("MqttRos2Bridge initialized");
+
         // ROS2 Publisher e Subscriber
         publisher_ = this->create_publisher<std_msgs::msg::String>(ROS2_PUB_TOPIC, 10);
         subscription_ = this->create_subscription<std_msgs::msg::String>(
@@ -68,6 +79,7 @@ public:
     // ROS2 -> MQTT
     void ros2_callback(const std_msgs::msg::String::SharedPtr msg) {
         RCLCPP_INFO(this->get_logger(), "ROS2 -> MQTT: %s", msg->data.c_str());
+        publishDebug("ROS2 -> MQTT: " + msg->data);
         mqtt_client_.publish(MQTT_PUB_TOPIC, msg->data.c_str(), msg->data.size());
     }
 
@@ -80,6 +92,7 @@ public:
     void message_arrived(mqtt::const_message_ptr msg) override {
         std::string payload = msg->get_payload_str();
         RCLCPP_INFO(this->get_logger(), "MQTT -> ROS2: %s", payload.c_str());
+        publishDebug("MQTT -> ROS2: " + payload);
 
         try {
             auto j = json::parse(payload);
@@ -109,6 +122,43 @@ public:
                 RCLCPP_INFO(this->get_logger(), "Published command: %s", command.c_str());
             }
 
+            // Cleaning mission
+            else if (j.contains("type") && j["type"] == "plan" && j.contains("zones") && j.contains("ros_base_pos")) {
+                vacuum_bot::msg::CoverageMission mission_msg;
+
+                for (auto &zone : j["zones"]) {
+                    vacuum_bot::msg::CoverageZone z;
+                    z.zone_id = zone["zone_id"].get<int>();
+                    z.intensity = zone["intensity"].get<int>();
+                    z.frequency = zone["frequency"].get<int>();
+
+                    geometry_msgs::msg::Polygon poly;
+                    for (auto &pt : zone["ros_points"]) {
+                        geometry_msgs::msg::Point32 p;
+                        p.x = pt["x"].get<float>();
+                        p.y = pt["y"].get<float>();
+                        p.z = 0.0;
+                        poly.points.push_back(p);
+                    }
+                    z.polygon = poly;
+                    mission_msg.plan.zones.push_back(z);
+                }
+
+                if (j["ros_base_pos"].contains("x") && j["ros_base_pos"].contains("y")) {
+                    geometry_msgs::msg::PoseStamped base_pose;
+                    base_pose.header.frame_id = "map";
+                    base_pose.header.stamp = this->now();
+                    base_pose.pose.position.x = j["ros_base_pos"]["x"].get<float>();
+                    base_pose.pose.position.y = j["ros_base_pos"]["y"].get<float>();
+                    base_pose.pose.position.z = 0.0;
+                    base_pose.pose.orientation.w = 1.0; // identità
+                    mission_msg.base_pose = base_pose;
+                }
+
+                mission_pub_->publish(mission_msg);
+                RCLCPP_INFO(this->get_logger(), "Published cleaning mission with %zu zones and base pose", mission_msg.plan.zones.size());
+            }
+
         } catch (const std::exception &e) {
             RCLCPP_ERROR(this->get_logger(), "Failed to parse MQTT JSON: %s", e.what());
         }
@@ -117,10 +167,18 @@ public:
     void delivery_complete(mqtt::delivery_token_ptr) {}
 
 private:
+    void publishDebug(const std::string & msg, const std::string & caller = "MqttRos2Bridge") {
+        std_msgs::msg::String debug_msg;
+        debug_msg.data = "[" + caller + "] " + msg;
+        debug_pub_->publish(debug_msg);
+    }
+
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
     rclcpp::Publisher<geometry_msgs::msg::Polygon>::SharedPtr coverage_pub_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr manual_pub_;
+    rclcpp::Publisher<vacuum_bot::msg::CoverageMission>::SharedPtr mission_pub_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr debug_pub_;
     mqtt::async_client mqtt_client_;
 };
 

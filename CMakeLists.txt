@@ -21,6 +21,7 @@ option(BUILD_FOR_ROBOT "Build minimal for robot" OFF)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(geometry_msgs REQUIRED)
 if(NOT BUILD_FOR_ROBOT)
   find_package(nav2_msgs REQUIRED)
@@ -43,6 +44,14 @@ include_directories(
   /usr/local/include
 )
 
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/CoverageZone.msg"
+  "msg/CoveragePlan.msg"
+  "msg/CoverageMission.msg"
+  DEPENDENCIES geometry_msgs
+ )
+ament_export_dependencies(rosidl_default_runtime)
+
 # Executables
 if(NOT BUILD_FOR_ROBOT)
   add_executable(sim_step_controller_node
@@ -60,6 +69,10 @@ endif()
 
 add_executable(mqtt_ros2_bridge
     src/mqtt_ros2_bridge.cpp
+)
+
+add_executable(debug_node 
+    src/debug_node.cpp
 )
 
 if(BUILD_FOR_ROBOT)
@@ -109,10 +122,20 @@ ament_target_dependencies(mqtt_ros2_bridge
   std_msgs
   geometry_msgs
 )
+
+ament_target_dependencies(debug_node rclcpp 
+    std_msgs
+)
+
 target_link_libraries(mqtt_ros2_bridge
   paho-mqttpp3
   paho-mqtt3as
 )
+rosidl_target_interfaces(mqtt_ros2_bridge
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
+rosidl_target_interfaces(coverage_nav2_node
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 if(BUILD_FOR_ROBOT)
 
@@ -122,7 +145,6 @@ if(BUILD_FOR_ROBOT)
   )
 
 endif()
-
 
 # Plugin export
 if(NOT BUILD_FOR_ROBOT)
@@ -155,6 +177,11 @@ if(BUILD_FOR_ROBOT)
     RUNTIME DESTINATION lib/${PROJECT_NAME}
   )
 endif()
+
+install(TARGETS
+  debug_node
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 install(
   DIRECTORY config description launch worlds
