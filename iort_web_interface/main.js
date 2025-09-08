@@ -12,7 +12,7 @@ const MQTT_SUB_TOPIC = "mqtt/out";
 const MQTT_PUB_TOPIC = "mqtt/in";
 
 const streamUrl = 'http://192.168.1.18:81/stream'; 
-const nodeRedUrl = 'http://localhost:1880/';
+const nodeRedUrl = 'http://localhost:1880';
 const webSocketUrl = 'ws://192.168.1.9:8080';
 
 
@@ -41,10 +41,35 @@ let zonesData = [];
 let operationsData = [];
 let conditionsData = [];
 let actionsData = [];
+let sessionData = [];
+
 
 let editingRule = null;
+let editingSessionId = null;
+let editingSensorId = null;
+let editingRobotId = null;
+
+
 let videoCollapsed = true;
 let videoConnected = false;
+
+
+let placingHomeBase = false;
+let homeBaseMarker = null;
+let homeBaseIconMarker = null;
+
+const homeBaseSize = 16; // square side size
+let homeBases = {};
+let placingHomeBaseRobotId = null;
+let selectedRobotColor;
+
+const homeIcon = L.icon({
+  iconUrl: 'imgs/home_white.png', 
+  iconSize: [22, 22], 
+  iconAnchor: [11, 11] 
+});
+
+let selectedZonesInOrder = [];
 
 editVirtualZoneBtn = document.getElementById('edit-zone');
 deleteVirtualZoneBtn = document.getElementById('delete-zone');
@@ -106,16 +131,26 @@ function connectMQTT() {
 // API CALLS
 // ==========================
 
+async function sendPlan() {
+  try {
+    const response = await fetch(`${nodeRedUrl}/start_plan`);
+    if (!response.ok) {
+        throw new Error("Errore nella risposta: " + response.status);
+    }
+  } catch (err) {
+    console.error("Errore nell'invio del piano:", err);
+  }
+}
+
 async function fetchRules() {
   try {
-    const response = await fetch(`${nodeRedUrl}rules`);
+    const response = await fetch(`${nodeRedUrl}/rules`);
     if (!response.ok) {
       throw new Error("Errore nella risposta: " + response.status);
     }
 
     const data = await response.json();
 
-    console.log("data", data);
 
     rulesData = data;
 
@@ -127,7 +162,7 @@ async function fetchRules() {
 
 async function addRule(rule) {
   try {
-    const res = await fetch(`${nodeRedUrl}rules`, {
+    const res = await fetch(`${nodeRedUrl}/rules`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(rule)
@@ -150,7 +185,7 @@ async function deleteRule(id) {
   if (!confirm("Sei sicuro di voler eliminare questa regola?")) return;
 
   try {
-    const res = await fetch(`${nodeRedUrl}rules/${id}`, {
+    const res = await fetch(`${nodeRedUrl}/rules/${id}`, {
       method: "DELETE"
     });
 
@@ -170,9 +205,11 @@ async function deleteRule(id) {
 
 async function fetchSensors() {
   try {
-    const res = await fetch(`${nodeRedUrl}sensors`);
+    const res = await fetch(`${nodeRedUrl}/sensors`);
     if (!res.ok) throw new Error(res.statusText);
     sensorsData = await res.json();
+
+    renderSensors();
 
     const select = document.getElementById("rule-sensor");
     select.innerHTML = "";
@@ -182,7 +219,6 @@ async function fetchSensors() {
       opt.textContent = sensor.name;
       select.appendChild(opt);
     });
-    console.log("Sensori caricati:", sensorsData);
   } catch (err) {
     console.error("Errore nel fetch dei sensori:", err);
   }
@@ -190,7 +226,7 @@ async function fetchSensors() {
 
 async function addSensor(name) {
   try {
-    const res = await fetch(`${nodeRedUrl}sensors`, {
+    const res = await fetch(`${nodeRedUrl}/sensors`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name })
@@ -213,29 +249,98 @@ async function addSensor(name) {
   }
 }
 
+async function deleteSensor(id) {
+  if (!confirm("Vuoi davvero eliminare questo sensore?")) return;
+
+  try {
+    await fetch(`${nodeRedUrl}/sensors/${id}`, { method: "DELETE" });
+    sensorsData = sensorsData.filter(s => s.id !== id);
+    renderSensors();
+  } catch (err) {
+    console.error("Errore eliminazione sensore:", err);
+  }
+}
+
 async function fetchRobots() {
   try {
-    const res = await fetch(`${nodeRedUrl}robots`);
+    const res = await fetch(`${nodeRedUrl}/robots`);
     if (!res.ok) throw new Error(res.statusText);
     robotsData = await res.json();
 
-    const select = document.getElementById("rule-robot");
-    select.innerHTML = "";
+    renderRobots();
+    renderRobotBases();
+
+    const ruleRobotSelect = document.getElementById("rule-robot");
+    const sessionRobotSelect = document.getElementById("session-robot");
+
+    // Populate rule modal select
+    ruleRobotSelect.innerHTML = "";
     robotsData.forEach(robot => {
       const opt = document.createElement("option");
       opt.value = robot.id;
       opt.textContent = robot.name;
-      select.appendChild(opt);
+      ruleRobotSelect.appendChild(opt);
     });
-    console.log("Robot caricati:", robotsData);
+
+    // Populate session modal select
+    sessionRobotSelect.innerHTML = "";
+    robotsData.forEach(robot => {
+      const opt = document.createElement("option");
+      opt.value = robot.id;
+      opt.textContent = robot.name;
+      sessionRobotSelect.appendChild(opt);
+    });
+
+    
+
   } catch (err) {
     console.error("Errore nel fetch dei robot:", err);
   }
 }
 
+function clearRobotBases() {
+  for (const robotId in homeBases) {
+    if (homeBases[robotId]) {
+      map.removeLayer(homeBases[robotId].marker);
+      map.removeLayer(homeBases[robotId].icon);
+    }
+  }
+  homeBases = {}; 
+}
+
+
+function renderRobotBases() {
+  clearRobotBases();
+
+  // Draw base stations
+  robotsData.forEach(robot => {
+    if (robot.leaflet_base_pos) {
+      const { lat, lng } = JSON.parse(robot.leaflet_base_pos);
+      console.log("Drawing base station for robot: " + robot.id);
+      console.log(lat, lng)
+
+      // Rettangolo
+      const rect = L.rectangle([
+        [lat - homeBaseSize/2, lng - homeBaseSize/2],
+        [lat + homeBaseSize/2, lng + homeBaseSize/2]
+      ], {
+        color: robot.color,
+        weight: 2,
+        fillColor: robot.color,
+        fillOpacity: 0.5
+      }).addTo(map);
+
+      // Icona home
+      const icon = L.marker([lat, lng], { icon: homeIcon }).addTo(map);
+
+      homeBases[robot.id] = { marker: rect, icon: icon };
+    }
+  });
+}
+
 async function addRobot(name) {
   try {
-    const res = await fetch(`${nodeRedUrl}robots`, {
+    const res = await fetch(`${nodeRedUrl}/robots`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name })
@@ -246,6 +351,7 @@ async function addRobot(name) {
     const newRobot = json[0];
 
     robotsData.push(newRobot);
+    renderRobotBases();
 
     const opt = document.createElement("option");
     opt.value = newRobot.id;
@@ -258,18 +364,28 @@ async function addRobot(name) {
   }
 }
 
+async function deleteRobot(id) {
+  if (!confirm("Vuoi davvero eliminare questo robot?")) return;
+
+  try {
+    await fetch(`${nodeRedUrl}/robots/${id}`, { method: "DELETE" });
+    robotsData = robotsData.filter(r => r.id !== id);
+    renderRobots();
+    renderRobotBases();
+  } catch (err) {
+    console.error("Errore eliminazione robot:", err);
+  }
+}
+
 async function fetchZones() {
   try {
-    const res = await fetch(`${nodeRedUrl}zones`);
+    const res = await fetch(`${nodeRedUrl}/zones`);
     if (!res.ok) throw new Error(res.statusText);
     zonesData = await res.json();
-
-    console.log("zonesData: ", zonesData[1]);
 
     const select = document.getElementById("rule-zone");
     select.innerHTML = "";
     zonesData.forEach(zone => {
-
       virtualZonesData.push({
         id: zone.id,
         name: zone.name,
@@ -285,7 +401,6 @@ async function fetchZones() {
     });
 
 
-    console.log("Zone caricate:", zonesData);
   } catch (err) {
     console.error("Errore nel fetch delle zone:", err);
   }
@@ -293,7 +408,7 @@ async function fetchZones() {
 
 async function addZone(name, color, rosPoints, leafletPoints) {
   try {
-    const res = await fetch(`${nodeRedUrl}zones`, {
+    const res = await fetch(`${nodeRedUrl}/zones`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, color, ros_points: rosPoints, leaflet_points: leafletPoints })
@@ -324,9 +439,40 @@ async function addZone(name, color, rosPoints, leafletPoints) {
   }
 }
 
+async function deleteZone() {
+  if (!confirm("Sei sicuro di voler eliminare questa zona?")) return;
+
+  if (!selectedZone) return;
+
+  const zoneId = selectedZone.id;
+
+  try {
+    const res = await fetch(`${nodeRedUrl}/zones/${zoneId}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text());
+
+    // Rimuovi il layer della zona dalla mappa
+    if (selectedZone.polygon) {
+      map.removeLayer(selectedZone.polygon);
+    }
+
+    // Rimuovi zona dai dati locali
+    virtualZonesData = virtualZonesData.filter(z => z.id !== zoneId);
+    zonesData = zonesData.filter(z => z.id !== zoneId);
+
+    clearSelectedZone();
+    renderZones();
+
+    console.log(`Zona con id ${zoneId} eliminata correttamente`);
+  } catch (err) {
+    console.error("Errore durante l'eliminazione della zona:", err);
+    alert("Errore durante l'eliminazione della zona");
+  }
+}
+
+
 async function fetchOperations() {
   try {
-    const res = await fetch(`${nodeRedUrl}operations`);
+    const res = await fetch(`${nodeRedUrl}/operations`);
     if (!res.ok) throw new Error(res.statusText);
     operationsData = await res.json();
 
@@ -338,7 +484,6 @@ async function fetchOperations() {
       opt.textContent = op.description;
       select.appendChild(opt);
     });
-    console.log("Operazioni caricate:", operationsData);
   } catch (err) {
     console.error("Errore nel fetch delle operazioni:", err);
   }
@@ -346,7 +491,7 @@ async function fetchOperations() {
 
 async function fetchConditions() {
   try {
-    const res = await fetch(`${nodeRedUrl}conditions`);
+    const res = await fetch(`${nodeRedUrl}/conditions`);
     if (!res.ok) throw new Error(res.statusText);
     conditionsData = await res.json();
 
@@ -358,7 +503,6 @@ async function fetchConditions() {
       opt.textContent = cond.description;
       select.appendChild(opt);
     });
-    console.log("Condizioni caricate:", conditionsData);
   } catch (err) {
     console.error("Errore nel fetch delle condizioni:", err);
   }
@@ -366,7 +510,7 @@ async function fetchConditions() {
 
 async function fetchActions() {
   try {
-    const res = await fetch(`${nodeRedUrl}actions`);
+    const res = await fetch(`${nodeRedUrl}/actions`);
     if (!res.ok) throw new Error(res.statusText);
     actionsData = await res.json();
 
@@ -378,11 +522,98 @@ async function fetchActions() {
       opt.textContent = act.description;
       select.appendChild(opt);
     });
-    console.log("Azioni caricate:", actionsData);
   } catch (err) {
     console.error("Errore nel fetch delle azioni:", err);
   }
 }
+
+async function fetchSessions() {
+  try {
+    const res = await fetch(`${nodeRedUrl}/sessions`);
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+
+    console.log(data)
+
+    const ruleSessionSelect = document.getElementById("rule-session");
+
+    sessionData = [];
+    data.forEach(dataRow => {
+      if (!sessionData.find(s => s.id === dataRow.id)) {
+        // Find all zones data for this session id
+        const zones = data.filter(row => row.id == dataRow.id).map(row => {
+          return {
+            id: row.zone_id,
+            name: row.zone_name,
+            ordering: row.ordering
+          };
+        })
+        
+        sessionData.push({
+          id: dataRow.id,
+          name: dataRow.name,
+          robot_id: dataRow.robot_id,
+          scheduled_start: dataRow.scheduled_start,
+          status: dataRow.status,
+          zones
+        });
+      }
+    });
+
+    console.log(sessionData);
+    
+    // Populate rule modal select
+    ruleSessionSelect.innerHTML = "";
+    sessionData.forEach(session => {
+      const opt = document.createElement("option");
+      opt.value = session.id;
+      opt.textContent = session.name;
+      ruleSessionSelect.appendChild(opt);
+    });
+
+    // Popola la tabella sessioni
+    renderSessions(sessionData);
+  } catch (err) {
+    console.error("Errore nel caricamento delle sessioni:", err);
+    alert("Errore durante il recupero delle sessioni");
+  }
+}
+
+
+async function addSession(session) {
+  try {
+    const res = await fetch(`${nodeRedUrl}/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(session)
+    });
+
+    if (!res.ok) throw new Error(await res.text());
+    const json = await res.json();
+    const newSession = json[0];
+
+    console.log("Sessione aggiunta:", newSession);
+    alert("Sessione creata con successo!");
+
+    closeSessionModal();
+  } catch (err) {
+    console.error("Errore nell'aggiunta della sessione:", err);
+    alert("Errore durante la creazione della sessione");
+  }
+}
+
+async function deleteSession(id) {
+  if (!confirm("Vuoi davvero eliminare questa sessione?")) return;
+
+  try {
+    await fetch(`${nodeRedUrl}/sessions/${id}`, { method: "DELETE" });
+    sessionsData = sessionsData.filter(s => s.id !== id);
+    renderSessions(sessionsData);
+  } catch (err) {
+    console.error("Errore eliminazione sessione:", err);
+  }
+}
+
 
 
 // ==========================
@@ -481,12 +712,10 @@ function initializeMap() {
     L.imageOverlay("maps/complete_house_map_save.png", bounds).addTo(map);
     map.fitBounds(bounds);
 
+    map.on('mousemove', followMouse);
+
     map.on("click", (e) => {
-
-      if (selectedZone) {
-        clearSelectedZone();
-      }
-
+      let latlng = e.latlng;
       const x_pix = e.latlng.lng;
       const y_pix = e.latlng.lat;
 
@@ -494,7 +723,47 @@ function initializeMap() {
       let x_ros = origin[0] + (x_pix * resolution);
       let y_ros = origin[1] + (y_pix * resolution);
 
-      let latlng = e.latlng;
+      if (selectedZone) {
+        clearSelectedZone();
+      }
+
+      if (placingHomeBase && placingHomeBaseRobotId) {
+        placingHomeBase = false;
+        map.off("mousemove", followMouse);
+
+        const bounds = homeBases[placingHomeBaseRobotId].marker.getBounds();
+        const center = bounds.getCenter();
+        console.log(`Homebase robot ${placingHomeBaseRobotId} posizionata in:`, center);
+
+        // Salvataggio della base del robot
+        const payload = {
+          id: placingHomeBaseRobotId,
+          ros_base_pos: { x: parseFloat(x_ros.toFixed(2)), y: parseFloat(y_ros.toFixed(2)) },       
+          leaflet_base_pos: latlng,
+          color: selectedRobotColor
+        };
+        fetch(`${nodeRedUrl}/robot_base`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        })
+        .then((res) => {
+          if (!res.ok) throw new Error("Errore PUT verso Node-RED");
+          return res.json();
+        })
+        .then((data) => {
+          console.log("Node-RED ha ricevuto la base:", data);
+        })
+        .catch((err) => {
+          console.error("Errore chiamata Node-RED:", err);
+        });
+
+        placingHomeBaseRobotId = null;
+        selectedRobotColor = null;
+        return;
+      }
+
+      
       // Snap to first point if close enough (from third point onward)
       if (rosPoints.length >= 2) {
         const dx = x_ros - parseFloat(rosPoints[0].x);
@@ -504,12 +773,11 @@ function initializeMap() {
           x_ros = parseFloat(rosPoints[0].x);
           y_ros = parseFloat(rosPoints[0].y);
           latlng = leafletPoints[0];
-          console.log("Snapped to first point to close polygon");
         }
       }
 
       // Save point
-      rosPoints.push({x: x_ros.toFixed(2), y: y_ros.toFixed(2)});
+      rosPoints.push({x: parseFloat(x_ros.toFixed(2)), y: parseFloat(y_ros.toFixed(2))});
       leafletPoints.push(latlng);
 
       // Draw polyline
@@ -533,6 +801,36 @@ function initializeMap() {
   };
 }
 
+function followMouse(e) {
+  if (placingHomeBase && placingHomeBaseRobotId) {
+    const latlng = e.latlng;
+    console.log(latlng)
+
+    if (!homeBases[placingHomeBaseRobotId]) {
+      const rect = L.rectangle([
+        [latlng.lat - homeBaseSize/2, latlng.lng - homeBaseSize/2],
+        [latlng.lat + homeBaseSize/2, latlng.lng + homeBaseSize/2]
+      ], {
+        color: selectedRobotColor,
+        weight: 2,
+        fillColor: selectedRobotColor,
+        fillOpacity: 0.5
+      }).addTo(map);
+
+      const icon = L.marker(latlng, { icon: homeIcon }).addTo(map);
+
+      homeBases[placingHomeBaseRobotId] = { marker: rect, icon: icon };
+    } else {
+      homeBases[placingHomeBaseRobotId].marker.setBounds([
+        [latlng.lat - 5, latlng.lng - 5],
+        [latlng.lat + 5, latlng.lng + 5]
+      ]);
+      homeBases[placingHomeBaseRobotId].icon.setLatLng(latlng);
+    }
+  }
+}
+
+
 function sendPolygon() {
   if (rosPoints.length < 3) { 
     alert("Il poligono necessita di almeno 3 punti"); 
@@ -543,11 +841,9 @@ function sendPolygon() {
   console.log("Sent Polygon via MQTT:", msg);
 }
 
-function drawVirtualZones() {
+function renderZones() {
   // Draw polylines
   for (let i = 0; i < virtualZonesData.length; i++) {
-
-    console.log("virtual zone: ", virtualZonesData[i]);
 
     const zone = virtualZonesData[i];
 
@@ -558,6 +854,7 @@ function drawVirtualZones() {
         fillOpacity: 0.4,
         bubblingMouseEvents: false
     }).addTo(map);
+    zone.polygon = polygon;
 
     const center = polygon.getBounds().getCenter();
     const label = L.tooltip({
@@ -568,6 +865,23 @@ function drawVirtualZones() {
     .setContent(zone.name)
     .setLatLng(center);
     polygon.bindTooltip(label).openTooltip();
+
+    polygon.on("click", function (e) {
+      // Deseleziona zona precedentemente selezionata
+      if (selectedZone && selectedZone.id !== zone.id) {
+        clearSelectedZone();
+      }
+
+      // Seleziona questa zona
+      selectedZone = virtualZonesData.find(z => z.id === zone.id);
+      console.log(selectedZone);
+      polygon.setStyle({ fillOpacity: 0.8 });
+
+      editVirtualZoneBtn.style.display = 'block';
+      deleteVirtualZoneBtn.style.display = 'block';
+
+      L.DomEvent.stop(e);
+    });
 
     // Draw markers
     // for (let j = 0; j < virtualZonesMarkers[i].length; j++) {
@@ -629,7 +943,7 @@ function createVirtualZone() {
   openZoneModal();
 }
 
-function editVirtualZone(zoneId) {
+function editVirtualZone() {
   if (!selectedZone) return;
 
   openZoneModal();
@@ -683,14 +997,13 @@ async function confirmVirtualZone() {
       selectedZone.polygon.bindTooltip(label).openTooltip();
 
       clearSelectedZone();
-      drawVirtualZones();
+      renderZones();
       return;
   }
-  console.log(selectedColor);
   await addZone(name, selectedColor, rosPoints, leafletPoints);
 
   clearMap();
-  drawVirtualZones();
+  renderZones();
   closeZoneModal();
 
   console.log("Creata stanza virtuale:", name);
@@ -707,6 +1020,38 @@ function clearSelectedZone() {
   document.getElementById("zoneNameInput").value = "";
   document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
   selectedColor = null;
+}
+
+function setHomePosition() {
+  // Apri modale selezione robot
+  const select = document.getElementById("homeBaseRobotSelect");
+  select.innerHTML = "";
+  robotsData.forEach(robot => {
+    const opt = document.createElement("option");
+    opt.value = robot.id;
+    opt.textContent = robot.name;
+    select.appendChild(opt);
+  });
+
+  document.getElementById("homeBaseModal").style.display = "flex";
+}
+
+function confirmHomeBaseSelection() {
+  placingHomeBaseRobotId = parseInt(document.getElementById("homeBaseRobotSelect").value);
+  selectedRobotColor = document.getElementById("robotColor").value;
+  placingHomeBase = true;
+
+  console.log(placingHomeBaseRobotId)
+
+  // Se il robot aveva già una base, rimuovila dalla mappa
+  if (homeBases[placingHomeBaseRobotId]) {
+    map.removeLayer(homeBases[placingHomeBaseRobotId].marker);
+    map.removeLayer(homeBases[placingHomeBaseRobotId].icon);
+    homeBases[placingHomeBaseRobotId] = null;
+  }
+
+  map.on("mousemove", followMouse);
+  document.getElementById("homeBaseModal").style.display = "none";
 }
 
 
@@ -741,16 +1086,16 @@ function sendManualCmd(command) {
 function openRuleForm(rule = null) {
   editingRule = rule;
 
-  console.log("rule", rule);
-
   if (rule) {
     document.getElementById("rule-name").value = rule.name;
     document.getElementById("rule-sensor").value = rule.sensor_id;
+    document.getElementById("rule-session").value = rule.session_id;
     document.getElementById("rule-robot").value = rule.robot_id;
     document.getElementById("rule-zone").value = rule.zone_id;
     document.getElementById("rule-operation").value = rule.operation_id;
-    document.getElementById("rule-condition").value = rule.condition_id;
+    document.getElementById("rule-condition").value = rule.comparator_id;
     document.getElementById("rule-value").value = rule.value;
+    document.getElementById("rule-interval").value = rule.interv;
     document.getElementById("rule-action").value = rule.action_id;
   } else {
     document.getElementById("rule-value").value = "";
@@ -764,63 +1109,126 @@ function closeRuleModal() {
   editingRule = null;
 }
 
-// Salva regola
-function saveRule() {
-  const newRule = {
-    id: editingRule ? editingRule.id : null,
+async function confirmRule() {
+  const ruleData = {
     name: document.getElementById("rule-name").value,
     sensor_id: parseInt(document.getElementById("rule-sensor").value),
+    session_id: parseInt(document.getElementById("rule-session").value),
     robot_id: parseInt(document.getElementById("rule-robot").value),
     zone_id: parseInt(document.getElementById("rule-zone").value),
     operation_id: parseInt(document.getElementById("rule-operation").value),
-    condition_id: parseInt(document.getElementById("rule-condition").value),
+    comparator_id: parseInt(document.getElementById("rule-condition").value),
     value: parseFloat(document.getElementById("rule-value").value),
     interv: document.getElementById("rule-interval").value,
     action_id: parseInt(document.getElementById("rule-action").value),
+    id: editingRule ? editingRule.id : null
   };
 
-  if (editingRule) {
-    const idx = rulesData.findIndex(r => r.id === editingRule.id);
-    rulesData[idx] = newRule;
-  } else {
-    addRule(newRule);
-  }
+  try {
+    if (editingRule) {
+      // PUT per aggiornamento
+      await fetch(`${nodeRedUrl}/rules`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ruleData)
+      });
+    } else {
+      // POST per nuova regola
+      await fetch(`${nodeRedUrl}/rules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ruleData)
+      });
+    }
 
-  renderRules();
-  closeRuleModal();
+    await fetchRules(); // ricarica le regole
+    closeRuleModal();
+  } catch (err) {
+    console.error("Errore salvataggio regola:", err);
+  }
 }
+
   
-function openSensorForm() {
-  document.getElementById("sensorModal").style.display = "flex";
+
+function openSensorForm(sensor = null) {
+  editingSensorId = sensor ? sensor.id : null;
+
+  document.getElementById("sensorNameInput").value = sensor ? sensor.name : "";
+
+  document.getElementById("sensorModal").style.display = "block";
+}
+
+async function confirmSensor() {
+  const name = document.getElementById("sensorNameInput").value;
+
+  try {
+    if (editingSensorId) {
+      await fetch(`${nodeRedUrl}/sensors`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, id: editingSensorId })
+      });
+    } else {
+      await fetch(`${nodeRedUrl}/sensors`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+    }
+
+    await fetchSensors();
+    closeSensorModal();
+  } catch (err) {
+    console.error("Errore salvataggio sensore:", err);
+  }
 }
 
 function closeSensorModal() {
   document.getElementById("sensorModal").style.display = "none";
+  editingSensorId = null;
+
+  document.getElementById("sensorNameInput").value = "";
 }
 
-function confirmSensor() {
-  const name = document.getElementById("sensorNameInput").value.trim();
-  if (!name) return alert("Inserisci un nome valido");
-  
-  addSensor(name);
-  closeSensorModal();
+
+function openRobotForm(robot = null) {
+  editingRobotId = robot ? robot.id : null;
+
+  document.getElementById("robotNameInput").value = robot ? robot.name : "";
+
+  document.getElementById("robotModal").style.display = "block";
 }
 
-function openRobotForm() {
-  document.getElementById("robotModal").style.display = "flex";
+async function confirmRobot() {
+  const name = document.getElementById("robotNameInput").value;
+
+  try {
+    if (editingRobotId) {
+      await fetch(`${nodeRedUrl}/robots`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, id: editingRobotId })
+      });
+    } else {
+      await fetch(`${nodeRedUrl}/robots`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+    }
+
+    await fetchRobots();
+    closeRobotModal();
+  } catch (err) {
+    console.error("Errore salvataggio robot:", err);
+  }
 }
 
 function closeRobotModal() {
   document.getElementById("robotModal").style.display = "none";
-}
+  editingRobotId = null;
 
-function confirmRobot() {
-  const name = document.getElementById("robotNameInput").value.trim();
-  if (!name) return alert("Inserisci un nome valido");
-
-  addRobot(name);
-
-  closeRobotModal();
+  document.getElementById("robotNameInput").value = "";
 }
 
 
@@ -845,6 +1253,121 @@ function confirmZone() {
   closeZoneFormModal();
 }
 
+function toDatetimeLocal(dateStr) {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    const pad = (n) => n.toString().padStart(2, "0");
+
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1);
+    const day = pad(date.getDate());
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+
+function openSessionForm(session = null) {
+  editingSessionId = session ? session.id : null;
+
+  document.getElementById("session-name").value = session ? session.name : "";
+  document.getElementById("session-robot").value = session ? session.robot_id : "";
+  document.getElementById("session-scheduled-start").value = session ? toDatetimeLocal(session.scheduled_start) : "";
+
+  const select = document.getElementById("session-zones");
+  select.innerHTML = "";
+
+  selectedZonesInOrder = [];
+
+  const sessionRow = sessionData.find(s => s.id === session.id);
+  const selectedZoneIds = sessionRow ? sessionRow.zones.map(z => z.id) : [];
+
+  console.log("Session data prima di confirm")
+  console.log(sessionData);
+
+  zonesData.forEach(zone => {
+    const option = document.createElement("option");
+    option.value = zone.id;
+    option.text = zone.name;
+
+    const sessionZone = sessionRow.zones.find(z => z.id === zone.id);
+
+    if (selectedZoneIds.includes(zone.id)) {
+      option.selected = true;
+      option.text = option.text += ` (${sessionZone.ordering})`
+    }
+
+    select.appendChild(option);
+  });
+
+  document.getElementById("sessionModal").style.display = "block";
+}
+
+async function confirmSession() {
+  if (selectedZonesInOrder.length === 0) {
+    alert("Selezionare almeno una zona");
+    return;
+  }
+
+  const name = document.getElementById("session-name").value;
+  const robot_id = document.getElementById("session-robot").value;
+  const scheduled_start = document.getElementById("session-scheduled-start").value;
+
+  const select = document.getElementById("session-zones");
+  const selectedZones = Array.from(select.selectedOptions).map(opt => opt.value);
+  console.log("Zone selezionate:", selectedZones);
+
+  const zones = selectedZonesInOrder.map(z => {
+    return {
+      id: parseInt(z),
+      intensity: 1,
+      frequency: 1
+    };
+  });
+
+  const body = { name, robot_id, scheduled_start, id: editingSessionId, zones };
+
+  try {
+    if (editingSessionId) {
+      await fetch(`${nodeRedUrl}/sessions`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      console.log("Sessione di pulizia aggiornata.")
+    } else {
+      await fetch(`${nodeRedUrl}/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      console.log("Sessione di pulizia creata.")
+    }
+
+    await fetchSessions(); 
+
+    console.log("Session data dopo confirm")
+    console.log(sessionData);
+
+    closeSessionModal();
+  } catch (err) {
+    console.error("Errore salvataggio sessione:", err);
+  }
+}
+
+
+function closeSessionModal() {
+  document.getElementById("sessionModal").style.display = "none";
+  editingSessionId = null;
+
+  // reset campi
+  document.getElementById("session-name").value = "";
+  document.getElementById("session-robot").value = "";
+  document.getElementById("session-scheduled-start").value = "";
+}
+
+
 function renderRules() {
   const tbody = document.getElementById("rules-list");
   tbody.innerHTML = "";
@@ -860,11 +1383,11 @@ function renderRules() {
     return;
   }
 
-  rulesData.forEach(rule => {
+  rulesData.forEach(rule => { // asdfasdfaskldfasdj
     const row = document.createElement("tr");
 
     const operation = operationsData.find(op => op.id === rule.operation_id);
-    const condition = conditionsData.find(cond => cond.id === rule.condition_id);
+    const condition = conditionsData.find(cond => cond.id === rule.comparator_id);
     const action = actionsData.find(act => act.id === rule.action_id);
     const sensor = sensorsData.find(s => s.id === rule.sensor_id);
     const robot = robotsData.find(r => r.id === rule.robot_id);
@@ -873,12 +1396,13 @@ function renderRules() {
     row.innerHTML = `
       <td>${rule.name}</td>
       <td>${sensor.name}</td>
+      <td>${rule.session_name}</td>
       <td>${robot.name}</td>
       <td>${zone.name}</td>
       <td>${operation.name}</td>
       <td>${condition.name}</td>
-      <td>${rule.interv}</td>
       <td>${rule.value}</td>
+      <td>${rule.interv}</td>
       <td>${action.name}</td>
       <td>
         <button class="edit-btn" onclick='openRuleForm(${JSON.stringify(rule).replace(/"/g, "&quot;")})'>Modifica</button>
@@ -888,6 +1412,96 @@ function renderRules() {
     tbody.appendChild(row);
   });
 }
+
+function renderSessions(sessions) {
+  const tbody = document.querySelector("#sessions-table tbody");
+  tbody.innerHTML = "";
+
+  if (sessions.length === 0) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 10;
+    cell.style.textAlign = "center";
+    cell.textContent = "Nessuna sessione definita";
+    row.appendChild(cell);
+    tbody.appendChild(row);
+    return;
+  }
+
+  sessions.forEach(session => {
+    const tr = document.createElement("tr");
+
+    const robot = robotsData.find(r => r.id === session.robot_id);
+
+    tr.innerHTML = `
+      <td>${session.id}</td>
+      <td>${session.name}</td>
+      <td>${robot.name}</td>
+      <td>${session.scheduled_start ? new Date(session.scheduled_start).toLocaleString() : "-"}</td>
+      <td>${session.status || "pending"}</td>
+      <td>
+        <button class="edit-btn" onclick='openSessionForm(${JSON.stringify(session).replace(/"/g, "&quot;")})'>Modifica</button>
+        <button class="delete-btn" onclick="deleteSession(${session.id})">Elimina</button>
+      </td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+
+function renderSensors() {
+  const tbody = document.getElementById("sensors-list");
+  tbody.innerHTML = "";
+
+  if (sensorsData.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="3" style="text-align:center;">Nessun sensore disponibile</td>`;
+    tbody.appendChild(row);
+    return;
+  }
+
+  sensorsData.forEach(sensor => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${sensor.id}</td>
+      <td>${sensor.name}</td>
+      <td>
+        <button class="edit-btn" onclick='openSensorForm(${JSON.stringify(sensor).replace(/"/g, "&quot;")})'>Modifica</button>
+        <button class="delete-btn" onclick="deleteSensor(${sensor.id})">Elimina</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+
+function renderRobots() {
+  const tbody = document.getElementById("robots-list");
+  tbody.innerHTML = "";
+
+  if (robotsData.length === 0) {
+    const row = document.createElement("tr");
+    row.innerHTML = `<td colspan="3" style="text-align:center;">Nessun robot disponibile</td>`;
+    tbody.appendChild(row);
+    return;
+  }
+
+  robotsData.forEach(robot => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${robot.id}</td>
+      <td>${robot.name}</td>
+      <td>
+        <button class="edit-btn" onclick='openRobotForm(${JSON.stringify(robot).replace(/"/g, "&quot;")})'>Modifica</button>
+        <button class="delete-btn" onclick="deleteRobot(${robot.id})">Elimina</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+
 
 async function fetchDecodings() {
   await fetchOperations();
@@ -903,13 +1517,14 @@ async function fetchDecodings() {
 window.onload = async function() {
     connectMQTT();
     initializeMap();
-    await fetchSensors();
     await fetchRobots();
+    await fetchSensors();
     await fetchZones();
     await fetchDecodings();
+    await fetchSessions();
     await fetchRules();
-    renderRules();
-    drawVirtualZones();
+
+    renderZones();
 
     document.getElementById("zoneNameInput").value = "";
 
@@ -920,4 +1535,21 @@ window.onload = async function() {
         selectedColor = this.dataset.color;
       });
     });
+
+    const zonesSelect = document.getElementById("session-zones");
+    // Aggiorna l’array quando l’utente seleziona/deseleziona
+    zonesSelect.addEventListener("change", () => {
+      const newlySelected = Array.from(zonesSelect.selectedOptions).map(opt => opt.value);
+
+      // Aggiunge i nuovi selezionati in fondo all’array, senza duplicati
+      newlySelected.forEach(id => {
+        if (!selectedZonesInOrder.includes(id)) selectedZonesInOrder.push(id);
+      });
+
+      // Rimuove i deselect dagli array
+      selectedZonesInOrder = selectedZonesInOrder.filter(id => newlySelected.includes(id));
+
+      console.log("Ordine selezione:", selectedZonesInOrder);
+    });
+
 };

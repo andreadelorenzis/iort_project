@@ -471,7 +471,12 @@
     }
 
     #rules-page h2 {
-      margin-bottom: 16px;
+      font-size: 1.6rem;
+      margin-top: 32px;
+      margin-bottom: 12px;
+      color: #ffffff;
+      /* border-bottom: 2px solid #3498db;
+      padding-bottom: 4px; */
     }
 
     #rules-list {
@@ -543,6 +548,96 @@
     .rule-btn.primary:hover {
       background: linear-gradient(135deg, #ee5a24 0%, #ff6b6b 100%);
     }
+
+
+    /* === SESSION MODAL === */
+    #sessionModal {
+      display: none;
+      position: fixed;
+      z-index: 2000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+
+    #sessionModal .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      width: 400px;
+      max-width: 90%;
+      text-align: left;
+      box-shadow: 0px 4px 12px rgba(0,0,0,0.3);
+      font-family: Arial, sans-serif;
+    }
+
+    #sessionModal h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      color: #8e44ad;
+    }
+
+    #sessionModal label {
+      display: block;
+      margin-top: 12px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    #sessionModal input,
+    #sessionModal select {
+      width: 100%;
+      padding: 8px;
+      margin-top: 6px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    #sessionModal input:focus,
+    #sessionModal select:focus {
+      outline: none;
+      border-color: #9b59b6;
+      box-shadow: 0 0 4px rgba(155, 89, 182, 0.6);
+    }
+
+    #sessionModal .modal-actions {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    #sessionModal .modal-actions button {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    #sessionModal .modal-actions button:first-child {
+      background: #8e44ad;
+      color: white;
+    }
+
+    #sessionModal .modal-actions button:first-child:hover {
+      background: #732d91;
+    }
+
+    #sessionModal .modal-actions button:last-child {
+      background: #ccc;
+      color: #333;
+    }
+
+    #sessionModal .modal-actions button:last-child:hover {
+      background: #aaa;
+    }
+
 
     /* === MODAL PER LE REGOLE === */
     #ruleModal {
@@ -616,38 +711,49 @@
     #ruleModal .modal-actions button:last-child:hover {
       background: #c0392b;
     }
+    
 
-    /* === RULES TABLE === */
-    #rules-table {
+    /* === TABLES === */
+
+    #rules-table, 
+    #sessions-table, 
+    #robots-table, 
+    #sensors-table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 20px;
       margin-bottom: 20px;
     }
 
-    #rules-table th,
-    #rules-table td {
+    #rules-table th, #sessions-table th, #robots-table th, #sensors-table th,
+    #rules-table td, #sessions-table td, #robots-table td, #sensors-table td {
       background: #f1f1f1;
       border: 1px solid #ddd;
       padding: 10px;
       text-align: center;
     }
 
-    #rules-table th {
+    #rules-table th, 
+    #sessions-table th, 
+    #robots-table th, 
+    #sensors-table th {
       background: #3498db;
       color: white;
     }
 
-    #rules-table tr:nth-child(even) {
+    #rules-table tr:nth-child(even), 
+    #sessions-table tr:nth-child(even), 
+    #robots-table tr:nth-child(even), 
+    #sensors-table tr:nth-child(even) {
       background: #f9f9f9;
     }
 
-    /* #rules-table tr:hover {
-      background: #f1f1f1;
-    } */
 
     /* Bottoni azione */
-    #rules-table button {
+    #rules-table button, 
+    #sessions-table button, 
+    #robots-table button, 
+    #sensors-table button {
       border: none;
       padding: 6px 10px;
       border-radius: 6px;
@@ -656,21 +762,49 @@
       color: white;
     }
 
-    #rules-table .edit-btn {
+    #rules-table .edit-btn, 
+    #sessions-table .edit-btn, 
+    #robots-table .edit-btn, 
+    #sensors-table .edit-btn {
       background: #27ae60;
     }
 
-    #rules-table .edit-btn:hover {
+    #rules-table .edit-btn:hover, 
+    #sessions-table .edit-btn:hover, 
+    #robots-table .edit-btn:hover, 
+    #sensors-table .edit-btn:hover {
       background: #1e8449;
     }
 
-    #rules-table .delete-btn {
+    #rules-table .delete-btn, 
+    #sessions-table .delete-btn, 
+    #robots-table .delete-btn, 
+    #sensors-table .delete-btn {
       background: #e74c3c;
     }
 
-    #rules-table .delete-btn:hover {
+    #rules-table .delete-btn:hover, 
+    #sessions-table .delete-btn:hover,  
+    #robots-table .delete-btn:hover,  
+    #sensors-table .delete-btn:hover {
       background: #c0392b;
     }
+
+
+.table-header {
+  display: flex;
+  align-items: center;
+  border-bottom: 2px solid #3498db;
+}
+
+.table-header button {
+  height: 40px;
+  margin-left: auto;
+}
+
+.table-header h2 {
+  padding-bottom: 4px;
+}
 
 /* === ACTIONS MODAL === */
 .modal {
@@ -745,6 +879,7 @@
 .modal-actions button:last-child {
   background-color: #c0392b;
 }
+
 
 /* ---------- COLOR SWATCH ---------- */
 .color-swatch {

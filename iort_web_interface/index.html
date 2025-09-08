@@ -14,30 +14,50 @@
     <nav class="nav">
       <button class="nav-btn active" onclick="showPage('map')">Controllo Mappa</button>
       <button class="nav-btn" onclick="showPage('manual')">Controllo Manuale</button>
-      <button class="nav-btn" onclick="showPage('rules')">Gestione Regole</button>
+      <button class="nav-btn" onclick="showPage('rules')">Gestione Sessioni</button>
     </nav>
   </div>
 
   <!-- Rules Page -->
   <div id="rules-page" class="page">
-    <div class="rule-buttons">
-      <button class="rule-btn" onclick="openRuleForm()">➕ Aggiungi regola</button>
-      <button class="rule-btn" onclick="openSensorForm()">➕ Aggiungi sensore</button>
-      <button class="rule-btn" onclick="openRobotForm()">➕ Aggiungi robot</button>
+
+    <div class="table-header">
+      <h2>Sessioni</h2>
+      <button class="rule-btn" onclick="openSessionForm()">➕ Aggiungi sessione</button>
     </div>
+    <table id="sessions-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Robot</th>
+          <th>Inizio programmato</th>
+          <th>Stato</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="sessions-list">
+         <!-- le regole vengono renderizzate via JS -->
+      </tbody>
+    </table>
 
     <!-- Lista regole -->
+    <div class="table-header">
+      <h2>Regole</h2>
+      <button class="rule-btn" onclick="openRuleForm()">➕ Aggiungi regola</button>
+    </div>
     <table id="rules-table">
       <thead>
         <tr>
           <th>Name</th>
           <th>Sensor</th>
+          <th>Session</th>
           <th>Robot</th>
           <th>Zone</th>
           <th>Operation</th>
           <th>Condition</th>
-          <th>Interval</th>
           <th>Value</th>
+          <th>Interval</th>
           <th>Action</th>
           <th>Actions</th>
         </tr>
@@ -47,6 +67,41 @@
       </tbody>
     </table>
 
+    <!-- Lista sensori -->
+     <div class="table-header">
+       <h2>Sensori</h2>
+       <button class="rule-btn" onclick="openSensorForm()">➕ Aggiungi sensore</button>
+     </div>
+    <table id="sensors-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="sensors-list">
+        <!-- sensori renderizzati via JS -->
+      </tbody>
+    </table>
+
+    <!-- Lista robot -->
+     <div class="table-header">
+       <h2>Robot</h2>
+       <button class="rule-btn" onclick="openRobotForm()">➕ Aggiungi robot</button>
+     </div>
+    <table id="robots-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nome</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="robots-list">
+        <!-- robot renderizzati via JS -->
+      </tbody>
+    </table>
     
     <!-- Modal Form -->
     <div id="ruleModal" class="modal">
@@ -58,11 +113,13 @@
         
         <label>Sensor</label>
         <select id="rule-sensor"></select>
+
         
         <label>Robot</label>
-        <select id="rule-robot">
-          <option value="robot1">robot1</option>
-        </select>
+        <select id="rule-robot"></select>
+
+        <label>Session</label>
+        <select id="rule-session"></select>
         
         <label>Zone</label>
         <select id="rule-zone"></select>
@@ -73,17 +130,17 @@
         <label>Condition</label>
         <select id="rule-condition"></select>
 
-        <label>Interval</label>
-        <input type="text" id="rule-interval" />
-        
         <label>Value</label>
         <input type="number" id="rule-value" />
+
+        <label>Interval</label>
+        <input type="text" id="rule-interval" />
         
         <label>Action</label>
         <select id="rule-action"></select>
 
         <div class="modal-actions">
-          <button onclick="saveRule()">Salva</button>
+          <button onclick="confirmRule()">Salva</button>
           <button onclick="closeRuleModal()">Annulla</button>
         </div>
       </div>
@@ -114,6 +171,30 @@
     </div>
   </div>
 
+    <div id="sessionModal" class="modal">
+    <div class="modal-content">
+      <h3>Nuova Sessione</h3>
+
+      <label>Nome</label>
+      <input type="text" id="session-name" placeholder="Inserisci il nome" />
+
+      <label>Robot</label>
+      <select id="session-robot"></select>
+
+      <label>Orario di inizio (schedulato)</label>
+      <input type="datetime-local" id="session-scheduled-start" />
+
+      <label>Zone</label>
+      <select id="session-zones" multiple></select>
+
+      <div class="modal-actions">
+        <button onclick="confirmSession()">Conferma</button>
+        <button onclick="closeSessionModal()">Annulla</button>
+      </div>
+    </div>
+  </div>
+
+
   <!-- Map Page -->
   <div id="map-page" class="page active">
     <div id="map"></div>
@@ -124,12 +205,28 @@
     </div> -->
     
     <div class="map-controls" id="map-controls">
-      <button class="map-btn primary" onclick="sendPolygon()">🚀 Invia Missione</button>
+      <button class="map-btn primary" onclick="sendPlan()">🚀 Invia Missione</button>
       <button class="map-btn" onclick="clearMap()">🗑️ Pulisci Mappa</button>
       <button class="map-btn" onclick="undoLastPoint()">↶ Annulla Punto</button>
+      <button class="map-btn" onclick="setHomePosition()">Posiziona base di ricarica</button>
       <button class="map-btn" onclick="createVirtualZone()">Crea stanza virtuale</button>
       <button class="map-btn" id="edit-zone" onclick="editVirtualZone()" style="display: none;">Modifica stanza virtuale</button>
-      <button class="map-btn" id="delete-zone" onclick="editVirtualZone()" style="display: none;">Elimina stanza virtuale</button>
+      <button class="map-btn" id="delete-zone" onclick="deleteZone()" style="display: none;">Elimina stanza virtuale</button>
+    </div>
+  </div>
+
+  <div id="homeBaseModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Seleziona il robot</h3>
+      <select id="homeBaseRobotSelect"></select>
+
+      <label for="robotColor">Colore base</label>
+      <input type="color" id="robotColor" name="robotColor" value="#ff0000">
+
+      <div class="modal-actions">
+        <button onclick="confirmHomeBaseSelection()">Conferma</button>
+        <button onclick="document.getElementById('homeBaseModal').style.display='none'">Annulla</button>
+      </div>
     </div>
   </div>
 
@@ -201,6 +298,7 @@
 
 
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
   <script src="main.js"></script>
 </body>
 </html>
