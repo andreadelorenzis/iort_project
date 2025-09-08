@@ -12,6 +12,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
+#include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "easywsclient.hpp"
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -45,6 +47,15 @@ public:
         std::bind(&StepController::cmd_callback, this, _1));
         RCLCPP_INFO(this->get_logger(), "Subscription on /cmd_vel created!");
 
+        // Publisher per debug
+        debug_pub_ = this->create_publisher<std_msgs::msg::String>("/debug", 10);
+
+        // Subscription al topic /cmd_intensity
+        intensity_sub_ = this->create_subscription<std_msgs::msg::Int32>(
+            "/cmd_intensity", 10,
+            std::bind(&StepController::intensityCallback, this, std::placeholders::_1)
+        );
+
         publish_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(50),
             std::bind(&StepController::send_command, this));
@@ -55,9 +66,27 @@ public:
 
         last_cmd_time_ = now();
         current_state = RobotState::STOP;
+
+        publishDebug("SimStepController initialized!");
     }
 
     private:
+
+    void publishDebug(const std::string & msg) {
+        std_msgs::msg::String debug_msg;
+        debug_msg.data = msg;
+        debug_pub_->publish(debug_msg);
+    }
+
+    void intensityCallback(const std_msgs::msg::Int32::SharedPtr msg)
+    {
+        int intensity = msg->data;
+
+        std_msgs::msg::String debug_msg;
+        publishDebug("Changed intensity to " + std::to_string(intensity));
+
+        RCLCPP_INFO(this->get_logger(), "Changed intensity to value %d", intensity);
+    }
 
     void cmd_callback(const geometry_msgs::msg::TwistStamped::SharedPtr msg)
     {
@@ -124,6 +153,8 @@ public:
 
     rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr subscription_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr intensity_sub_;
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr debug_pub_;
     rclcpp::TimerBase::SharedPtr publish_timer_;
     
     rclcpp::Clock::SharedPtr clock_;
