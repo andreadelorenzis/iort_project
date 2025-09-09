@@ -9,8 +9,8 @@
 #include <Adafruit_SSD1306.h>
 
 // Replace with your network credentials
-const char* ssid = "Vodafone-C01140081";
-const char* password = "SaveThePlanet@2023";
+const char* ssid = "";
+const char* password = "";
 const char* mqtt_server = "192.168.1.9";
 
 WiFiClient espClient;
