@@ -12,8 +12,8 @@ const MQTT_SUB_TOPIC = "mqtt/out";
 const MQTT_PUB_TOPIC = "mqtt/in";
 
 const streamUrl = 'http://192.168.1.18:81/stream'; 
-const nodeRedUrl = 'http://localhost:1880';
-const webSocketUrl = 'ws://192.168.1.9:8080';
+// const nodeRedUrl = 'http://localhost:1880';
+const nodeRedUrl = 'http://localhost/nodered';
 
 
 // ==========================
@@ -117,7 +117,7 @@ function connectMQTT() {
     console.log("Disconnesso dal broker MQTT");
     document.getElementById('status-dot').classList.remove('connected');
     document.getElementById('status-text').textContent = 'Disconnesso';
-    setTimeout(connectMQTT, 3000); // reconnect
+    // setTimeout(connectMQTT, 3000); // reconnect
   });
 
   mqttClient.on("error", function () {
@@ -1059,22 +1059,25 @@ function confirmHomeBaseSelection() {
 // MANUAL CONTROL PAGE
 // ==========================
 
-function sendManualCmd(command) {
-  const msg = { type: "manual", command };
-  mqttClient.publish(MQTT_PUB_TOPIC, JSON.stringify(msg));
-  console.log("Sent command via MQTT:", command);
+async function sendManualCmd(command) {
+  try {
+    const res = await fetch(`${nodeRedUrl}/manual`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({cmd: command})
+    });
 
-  const buttons = document.querySelectorAll('.direction-btn, .center-btn');
-  buttons.forEach(btn => {
-    if (btn.onclick.toString().includes(command)) {
-      btn.style.transform = btn.classList.contains('center-btn') ? 
-        'translate(-50%, -50%) scale(0.9)' : 'scale(0.9)';
-      setTimeout(() => {
-        btn.style.transform = btn.classList.contains('center-btn') ? 
-          'translate(-50%, -50%)' : '';
-      }, 150);
-    }
-  });
+    if (!res.ok) throw new Error(await res.text());
+    const json = await res.json();
+    const newRule = json[0];
+
+    rulesData.push(newRule);
+    renderRules();
+
+    console.log("Sent command:", command);
+  } catch (err) {
+    console.error("Errore nell'invio del comando:", err);
+  }
 }
 
 
@@ -1515,7 +1518,7 @@ async function fetchDecodings() {
 // ==========================
 
 window.onload = async function() {
-    connectMQTT();
+    // connectMQTT();
     initializeMap();
     await fetchRobots();
     await fetchSensors();
