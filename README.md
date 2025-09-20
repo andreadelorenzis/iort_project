@@ -50,7 +50,7 @@ It works together with several ROS2 packages:
 **Coverage zone example**
 
 <p align="center">
-  <img src="imgs/coverage_path_example.png" alt="ROS2 Packages Overview" width="400"/>
+  <img src="imgs/coverage_path_example.png" alt="ROS2 Packages Overview" width="600"/>
 </p>
 
 
@@ -93,12 +93,12 @@ A simple HTML/CSS/JS interface for:
 
 **Map control page**
 <p align="center">
-  <img src="imgs/web_interface_map.png" alt="Web Interface" width="600"/>
+  <img src="imgs/web_interface_map.png" alt="Web Interface" width="800"/>
 </p>
 
 **Sessions control page**
 <p align="center">
-  <img src="imgs/test_page_screen.png" alt="Web Interface" width="600"/>
+  <img src="imgs/test_page_screen.png" alt="Web Interface" width="800"/>
 </p>
 
 ## Documentation
