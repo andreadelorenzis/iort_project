@@ -35,6 +35,16 @@ def generate_launch_description():
         description='World to load'
         )
     
+    start_x_arg = DeclareLaunchArgument(
+        'start_x', default_value='-1.62', description='Posizione iniziale X'
+    )
+    start_y_arg = DeclareLaunchArgument(
+        'start_y', default_value='-5.11', description='Posizione iniziale Y'
+    )
+    start_theta_arg = DeclareLaunchArgument(
+        'start_theta', default_value='1.57', description='Orientamento iniziale Theta'
+    )
+
     twist_mux_params = os.path.join(get_package_share_directory(package_name),'config','twist_mux.yaml')
     
     # Start robot state publisher
@@ -71,12 +81,12 @@ def generate_launch_description():
         arguments=[
             '-topic', 'robot_description',
             '-name', 'my_bot',
-            '-x', '0.0',
-            '-y', '0.0',
+            '-x', LaunchConfiguration('start_x'),
+            '-y', LaunchConfiguration('start_y'),
             '-z', '0.1',
             '-R', '0.0',
             '-P', '0.0',
-            '-Y', '0.0'
+            '-Y', LaunchConfiguration('start_theta')
         ],
         output='screen')
 
@@ -130,6 +140,12 @@ def generate_launch_description():
         'mapper_params_online_async.yaml'
     )
 
+    slam_toolbox_params = {
+        'map_start_pose': [LaunchConfiguration('start_x'), 
+                           LaunchConfiguration('start_y'), 
+                           LaunchConfiguration('start_theta')]
+    }
+
     slam_toolbox = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([os.path.join(
             get_package_share_directory('slam_toolbox'),
@@ -138,7 +154,8 @@ def generate_launch_description():
         )]),
         launch_arguments={
             'slam_params_file': slam_params_file,
-            'use_sim_time': 'true'
+            'use_sim_time': 'true',
+            'params': slam_toolbox_params
         }.items()
     )
 
@@ -222,6 +239,9 @@ def generate_launch_description():
 
     # Launch them all!
     return LaunchDescription([
+        start_x_arg,
+        start_y_arg,
+        start_theta_arg,
         rsp,
         joystick,
         twist_mux,
