@@ -10,7 +10,7 @@ Here's a short description of the main components of this project:
 - **web_interface**: Web interface for control and configuration
 
 
-## VacuumBot (ROS2)
+## VacuumBot ROS2 package
 
 ROS2 package that handles:
 - Integration with the physical vacuum cleaner via IR commands  
@@ -39,11 +39,14 @@ By integrating it with ROS2, external sensors, and the IoT infrastructure, its c
 The `vacuumbot/` package provides the main integration with the robotic vacuum cleaner, enabling both simulation and real-world operation.  
 It works together with several ROS2 packages:
 
-- **slam_toolbox** → Provides mapping and localization (SLAM) so the robot can build and use a map of the environment.  
-- **nav2 (Navigation2)** → Handles path planning, obstacle avoidance, and autonomous navigation.  
-- **turtlebot3_gazebo** (for simulation) → Used to simulate the robot in a Gazebo environment before testing on the real device.  
-- **rviz2** → Visualization tool to monitor the robot’s sensors, map, and trajectory.  
-- **teleop_twist_keyboard** → Allows manual robot control from the keyboard (useful for testing).  
+- **vacuumbot/** → Main integration package for the robotic vacuum, handles communication with the robot.
+- **SLAM Toolbox** → Generates 2D maps and handles localization using LiDAR data.
+- **Nav2** → Performs autonomous navigation and path planning on the generated map.
+- **OpenNav-Coverage** → Generates optimal coverage paths for cleaning or exploration.
+- **StepController** → Custom node that converts continuous navigation commands into discrete IR signals.
+- **Gazebo** → Simulates the robot and environment for testing SLAM, navigation, and coverage.
+- **RViz2** → Visualizes the robot state, LiDAR scans, maps, and camera feed.
+
 
 **Coverage zone example**
 
@@ -100,7 +103,7 @@ A simple HTML/CSS/JS interface for:
 </p>
 
 ## Documentation
-For more details on the achieved results, refer to the following: <a href="/presentation.pdf" target="_blank">presentation</a>.
+For more details on the achieved results, refer to the following <a href="/presentation.pdf" target="_blank">presentation</a>.
 
 Here you can read the <a href="report/report.pdf" target="_blank">full report</a> (in italian though). 
 
