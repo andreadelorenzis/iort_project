@@ -82,7 +82,10 @@ A simple HTML/CSS/JS interface for:
   <img src="imgs/web_interface_map.png" alt="Web Interface" width="800"/>
 </p>
 
-
+**Manual control page**
+<p align="center">
+  <img src="imgs/web_interface_manual.png" alt="Web Interface" width="800"/>
+</p>
 
 **Sessions & Rules management page**
 <p align="center">
