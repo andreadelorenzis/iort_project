@@ -69,20 +69,6 @@ Then it publishes data periodically to the MQTT broker.
   <img src="imgs/iot_circuit.png" alt="IOT circuit diagram" width="300"/>
 </p>
 
-## IoT Infrastructure (IOTstack)
-Built with Docker containers:
-- **Mosquitto** → MQTT broker  
-- **Node-RED** → Flow management & automation  
-- **InfluxDB** → Time-series database  
-- **Grafana** → Visualization dashboards  
-- **MariaDB** → Storage for rules and configs  
-- **Nginx** → Serves the web interface  
-- **Portainer** → Docker management  
-
-<p align="center">
-  <img src="imgs/infra_diagram_light.png" alt="IOT infrastructure diagram" width="800"/>
-</p>
-
 ## Web Interface
 
 A simple HTML/CSS/JS interface for:
@@ -91,12 +77,14 @@ A simple HTML/CSS/JS interface for:
 - Sending commands to the robot  
 - Monitoring sensors in real-time  
 
-**Map control page**
+**Zones management page**
 <p align="center">
   <img src="imgs/web_interface_map.png" alt="Web Interface" width="800"/>
 </p>
 
-**Sessions control page**
+
+
+**Sessions & Rules management page**
 <p align="center">
   <img src="imgs/test_page_screen.png" alt="Web Interface" width="800"/>
 </p>
