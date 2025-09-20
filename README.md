@@ -80,7 +80,7 @@ Built with Docker containers:
 - **Portainer** → Docker management  
 
 <p align="center">
-  <img src="imgs/infra_diagram_light.png" alt="IOT infrastructure diagram" width="600"/>
+  <img src="imgs/infra_diagram_light.png" alt="IOT infrastructure diagram" width="800"/>
 </p>
 
 ## Web Interface
