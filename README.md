@@ -5,7 +5,6 @@ The goal is to integrate a low-cost commercial robotic vacuum cleaner into an **
 
 Here's a short description of the main components of this project:
 - **MQTTSensorNode**: Arduino (ESP32) code for MQTT sensor nodes
-- **iotstack**: Backup of the IOTstack configuration (Docker + services)
 - **vacuumbot**: ROS2 package for the robotic vacuum
 - **web_interface**: Web interface for control and configuration
 
