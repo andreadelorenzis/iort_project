@@ -47,6 +47,10 @@ public:
         std::bind(&StepController::cmd_callback, this, _1));
         RCLCPP_INFO(this->get_logger(), "Subscription on /cmd_vel created!");
 
+        manual_cmd_sub_ = this->create_subscription<std_msgs::msg::String>(
+        "/manual_cmd", 10, std::bind(&StepController::manual_cmd_callback, this, _1));
+        RCLCPP_INFO(this->get_logger(), "Subscription on /manual_cmd created!");
+            
         // Publisher per debug
         debug_pub_ = this->create_publisher<std_msgs::msg::String>("/debug", 10);
 
@@ -109,6 +113,20 @@ public:
         }
     }
 
+    void manual_cmd_callback(const std_msgs::msg::String::SharedPtr msg)
+    {
+        std::string cmd = msg->data;
+        if (cmd == "LEFT")       current_state = RobotState::LEFT;
+        else if (cmd == "RIGHT") current_state = RobotState::RIGHT;
+        else if (cmd == "FORWARD") current_state = RobotState::FORWARD;
+        else if (cmd == "STOP")  current_state = RobotState::STOP;
+
+        // Set last time two seconds in the future so that the watchdog is
+        // not immediately triggered
+        auto now_time = now();              
+        last_cmd_time_ = now_time + std::chrono::seconds(2); 
+    }
+
     void send_command()
     {
         auto it = command_map.find(this->current_state);
@@ -155,6 +173,7 @@ public:
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr intensity_sub_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr debug_pub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr manual_cmd_sub_;
     rclcpp::TimerBase::SharedPtr publish_timer_;
     
     rclcpp::Clock::SharedPtr clock_;
