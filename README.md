@@ -3,11 +3,10 @@
 This project was developed as a case study for the course **Programming for the Internet of Things** at the University of Urbino Carlo Bo.  
 The goal is to integrate a low-cost commercial robotic vacuum cleaner into an **IoRT (Internet of Robotic Things)** ecosystem, enhanced with environmental sensors and an IoT infrastructure based on Docker containers.
 
-
-## Project Structure
+Here's a short description of the main components of this project:
 - **MQTTSensorNode**: Arduino (ESP32) code for MQTT sensor nodes
 - **iotstack**: Backup of the IOTstack configuration (Docker + services)
-**vacuumbot**: ROS2 package for the robotic vacuum
+-- **vacuumbot**: ROS2 package for the robotic vacuum
 - **web_interface**: Web interface for control and configuration
 
 
