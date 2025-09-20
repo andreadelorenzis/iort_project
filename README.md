@@ -15,33 +15,25 @@ Here's a short description of the main components of this project:
 ROS2 package that handles:
 - Integration with the physical vacuum cleaner via IR commands  
 - Integration with the IORT system via a MQTT bridge
+- Cleaning/coverage plan generation
 
+The robotic vacuum cleaner used in this project is a low-cost commercial device, modified to be part of the IoRT ecosystem.  
+Key components include:
+
+
+- **IR transmitter and receiver** → Used to externally control the robot by reproducing the same IR commands as the original remote control.  
+- **LiDAR LD19** → A 2D LiDAR sensor used to create a map of the environment and localize the robot. It is connected to the Raspberry Pi via a USB-to-UART/TTL adapter.  
+- **ESP32-CAM** → A small, low-cost camera module with an onboard ESP32, providing a POV (Point of View) stream from the robot.  
+- **Raspberry Pi 4** → The “brain” of the robot. It processes onboard sensor data, communicates with an edge computer for planning, and controls the robot via the IR transmitter.  
+- **Powerbank (5V/3A)** → Provides power to all the additional components.  
+
+
+The robot itself has limited built-in “intelligence”.  
+By integrating it with ROS2, external sensors, and the IoT infrastructure, its capabilities are extended to include autonomous navigation, environmental awareness, and remote control.
 
 <p align="center">
   <img src="imgs/robot_top2.png" alt="VacuumBot ROS2" width="400"/>
 </p>
-
-
-## MQTT Sensor Node (ESP32)
-
-Arduino sketch (`MQTTSensorNode.ino`) for an **ESP32** board.  
-It reads data from multiple sensors:
-- PIR (motion)  
-- IR (obstacles)  
-- Light  
-- Temperature & Humidity  
-
-Then it publishes data periodically to the MQTT broker.
-
-## IoT Infrastructure (IOTstack)
-Built with Docker containers:
-- **Mosquitto** → MQTT broker  
-- **Node-RED** → Flow management & automation  
-- **InfluxDB** → Time-series database  
-- **Grafana** → Visualization dashboards  
-- **MariaDB** → Storage for rules and configs  
-- **Nginx** → Serves the web interface  
-- **Portainer** → Docker management  
 
 ## Other ROS packages used
 The `vacuumbot/` package provides the main integration with the robotic vacuum cleaner, enabling both simulation and real-world operation.  
@@ -59,6 +51,36 @@ It works together with several ROS2 packages:
   <img src="imgs/coverage_path_example.png" alt="ROS2 Packages Overview" width="400"/>
 </p>
 
+
+## MQTT Sensor Node (ESP32)
+
+Arduino sketch (`MQTTSensorNode.ino`) for an **ESP32** board.  
+It reads data from multiple sensors:
+- PIR (motion)  
+- IR (obstacles)  
+- Light  
+- Temperature & Humidity  
+
+Then it publishes data periodically to the MQTT broker.
+
+<p align="center">
+  <img src="imgs/iot_circuit.png" alt="IOT circuit diagram" width="300"/>
+</p>
+
+## IoT Infrastructure (IOTstack)
+Built with Docker containers:
+- **Mosquitto** → MQTT broker  
+- **Node-RED** → Flow management & automation  
+- **InfluxDB** → Time-series database  
+- **Grafana** → Visualization dashboards  
+- **MariaDB** → Storage for rules and configs  
+- **Nginx** → Serves the web interface  
+- **Portainer** → Docker management  
+
+<p align="center">
+  <img src="imgs/infra_diagram_light.png" alt="IOT infrastructure diagram" width="600"/>
+</p>
+
 ## Web Interface
 
 A simple HTML/CSS/JS interface for:
@@ -69,12 +91,12 @@ A simple HTML/CSS/JS interface for:
 
 **Map control page**
 <p align="center">
-  <img src="imgs/web_interface_map.png" alt="Web Interface" width="400"/>
+  <img src="imgs/web_interface_map.png" alt="Web Interface" width="600"/>
 </p>
 
 **Sessions control page**
 <p align="center">
-  <img src="imgs/test_page_screen.png" alt="Web Interface" width="400"/>
+  <img src="imgs/test_page_screen.png" alt="Web Interface" width="600"/>
 </p>
 
 ## Documentation
