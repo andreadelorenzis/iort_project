@@ -95,5 +95,5 @@ A simple HTML/CSS/JS interface for:
 ## Documentation
 For more details on the achieved results, refer to the following <a href="/presentation.pdf" target="_blank">presentation</a>.
 
-Here you can read the <a href="report/report.pdf" target="_blank">full report</a> (in italian though). 
+Here you can read the <a href="/report.pdf" target="_blank">full report</a> (in italian though). 
 
